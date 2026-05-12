@@ -1,47 +1,56 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState, useCallback } from "react";
+import { supabase } from "@/lib/supabase";
 
-type MachineStatus = "critical" | "warning" | "good";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-interface Machine {
+type HealthLabel = "Healthy" | "Warning" | "Critical";
+type RiskLevel   = "LOW" | "MEDIUM" | "HIGH";
+
+interface SensorRow {
+  machine_id: string;
+  timestamp: string;
+  temperature: number;
+  vibration: number;
+  pressure: number;
+  rpm: number;
+  power_consumption: number;
+  noise_level: number;
+  humidity: number;
+  operating_hours: number;
+}
+
+interface MachineRow {
   id: string;
-  status: MachineStatus;
   healthScore: number;
-  rul: string;
+  healthLabel: HealthLabel;
+  failureProb: number;
+  willFail: boolean;
+  riskLevel: RiskLevel;
+  recommendation: string;
+  status: "critical" | "warning" | "good";
+  latestSensor: SensorRow | null;
 }
 
-interface Alert {
-  id: number;
-  severity: "CRITICAL" | "WARNING";
-  machine: string;
-  message: string;
-  time: string;
+interface SensorTrend {
+  label: string;
+  temperature: number;
+  vibration: number;
+  noise_level: number;
 }
 
-// ── Static data (ganti dengan fetch dari database) ─────────────────────────
-const machines: Machine[] = [
-  { id: "M-01", status: "critical", healthScore: 28, rul: "8.3 jam" },
-  { id: "M-02", status: "warning",  healthScore: 61, rul: "31 jam"  },
-  { id: "M-03", status: "good",     healthScore: 91, rul: "120+ jam"},
-  { id: "M-04", status: "good",     healthScore: 85, rul: "120+ jam"},
-  { id: "M-05", status: "good",     healthScore: 73, rul: "85 jam"  },
-];
+function labelToStatus(label: HealthLabel): MachineRow["status"] {
+  if (label === "Critical") return "critical";
+  if (label === "Warning")  return "warning";
+  return "good";
+}
 
-const alerts: Alert[] = [
-  { id: 1, severity: "CRITICAL", machine: "M-01", message: "Health score turun drastis, RUL < 10 jam", time: "2 menit lalu" },
-  { id: 2, severity: "WARNING",  machine: "M-02", message: "Vibrasi melebihi batas normal", time: "15 menit lalu" },
-];
+function healthScoreFromProb(probs: { Healthy: number; Warning: number; Critical: number }): number {
+  return Math.round(probs.Healthy * 100 + probs.Warning * 50 + probs.Critical * 0);
+}
 
-const stats = {
-  totalMesin: 20,
-  statusKritis: 2,
-  avgHealthScore: 74,
-  rulTerpendek: "8.3 jam",
-  rulMachine: "M-01",
-};
-
-// ── Helpers ────────────────────────────────────────────────────────────────
 function barColor(score: number) {
   if (score < 40) return "bg-red-500";
   if (score < 70) return "bg-amber-400";
@@ -54,104 +63,286 @@ function scoreColor(score: number) {
   return "text-green-400";
 }
 
-// ── Sensor Chart (SVG) ─────────────────────────────────────────────────────
-const sensorData = {
-  labels: ["00:00","04:00","08:00","12:00","16:00","20:00","24:00"],
-  temperature: [55, 58, 60, 62, 65, 70, 78],
-  vibration:   [50, 52, 54, 56, 58, 62, 68],
-  noise:       [48, 50, 53, 55, 57, 60, 65],
-};
+function riskBadge(level: RiskLevel) {
+  if (level === "HIGH")   return "bg-red-500/20 text-red-400 border border-red-500/30";
+  if (level === "MEDIUM") return "bg-amber-400/20 text-amber-400 border border-amber-400/30";
+  return "bg-green-500/20 text-green-400 border border-green-500/30";
+}
 
-function SensorChart() {
+function SensorChart({ data }: { data: SensorTrend[] }) {
   const W = 320, H = 160, padL = 28, padR = 8, padT = 8, padB = 24;
-  const innerW = W - padL - padR;
-  const innerH = H - padT - padB;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
 
-  function toX(i: number) { return padL + (i / (sensorData.labels.length - 1)) * innerW; }
-  function toY(v: number) { return padT + innerH - ((v - 0) / 100) * innerH; }
-  function makePath(data: number[]) {
-    return data.map((v, i) => `${i === 0 ? "M" : "L"}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(" ");
-  }
+  if (data.length === 0) return (
+    <div className="h-40 flex items-center justify-center">
+      <p className="text-[11px] text-zinc-600">Tidak ada data sensor</p>
+    </div>
+  );
+
+  const allVals = data.flatMap(d => [d.temperature, d.vibration * 100, d.noise_level]);
+  const minV = Math.min(...allVals), maxV = Math.max(...allVals);
+  const range = maxV - minV || 1;
+
+  const toX = (i: number) => padL + (i / Math.max(data.length - 1, 1)) * innerW;
+  const toY = (v: number) => padT + innerH - ((v - minV) / range) * innerH;
+  const makePath = (vals: number[]) =>
+    vals.map((v, i) => `${i === 0 ? "M" : "L"}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(" ");
+
+  const step = Math.ceil(data.length / 6);
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" aria-label="Sensor trends line chart">
-      {[0, 25, 50, 75, 100].map((t) => (
-        <g key={t}>
-          <line x1={padL} y1={toY(t)} x2={W - padR} y2={toY(t)} stroke="#ffffff10" strokeWidth="0.5"/>
-          <text x={padL - 4} y={toY(t) + 3.5} textAnchor="end" fill="#555" fontSize="8">{t}</text>
-        </g>
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" aria-label="Sensor trends">
+      {[0, 0.25, 0.5, 0.75, 1].map((t, i) => {
+        const v = minV + range * t;
+        return (
+          <g key={i}>
+            <line x1={padL} y1={toY(v)} x2={W - padR} y2={toY(v)} stroke="#ffffff10" strokeWidth="0.5"/>
+            <text x={padL - 4} y={toY(v) + 3.5} textAnchor="end" fill="#555" fontSize="7">{v.toFixed(0)}</text>
+          </g>
+        );
+      })}
+      {data.filter((_, i) => i % step === 0).map((d, i) => (
+        <text key={i} x={toX(i * step)} y={H - 6} textAnchor="middle" fill="#555" fontSize="7">{d.label}</text>
       ))}
-      {sensorData.labels.map((l, i) => (
-        <text key={l} x={toX(i)} y={H - 6} textAnchor="middle" fill="#555" fontSize="8">{l}</text>
-      ))}
-      <path d={makePath(sensorData.temperature)} fill="none" stroke="#e24b4a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-      <path d={makePath(sensorData.vibration)}   fill="none" stroke="#ef9f27" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="4 2"/>
-      <path d={makePath(sensorData.noise)}       fill="none" stroke="#378add" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="2 3"/>
+      <path d={makePath(data.map(d => d.temperature))} fill="none" stroke="#e24b4a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d={makePath(data.map(d => d.vibration * 100))} fill="none" stroke="#ef9f27" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="4 2"/>
+      <path d={makePath(data.map(d => d.noise_level))} fill="none" stroke="#378add" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="2 3"/>
     </svg>
   );
 }
 
-// ── Page ───────────────────────────────────────────────────────────────────
+function Skeleton({ className }: { className?: string }) {
+  return <div className={`animate-pulse bg-white/5 rounded ${className}`}/>;
+}
+
 export default function DashboardPage() {
+  const [machines, setMachines]       = useState<MachineRow[]>([]);
+  const [sensorTrend, setSensorTrend] = useState<SensorTrend[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState<string | null>(null);
+  const [lastUpdate, setLastUpdate]   = useState<string>("");
+
+  const fetchAll = useCallback(async () => {
+    try {
+      setError(null);
+
+      // 1. Ambil data sensor terbaru dari Supabase
+      const { data: sensorData, error: sErr } = await supabase
+        .from("sensor_readings")
+        .select("*")
+        .order("timestamp", { ascending: false })
+        .limit(2000);
+
+      if (sErr) throw new Error(`Supabase: ${sErr.message}`);
+
+      // Ambil 1 data terbaru per mesin
+      const latestPerMachine: Record<string, SensorRow> = {};
+      for (const row of (sensorData ?? [])) {
+        if (!latestPerMachine[row.machine_id]) {
+          latestPerMachine[row.machine_id] = row;
+        }
+      }
+
+      const machineIds = Object.keys(latestPerMachine).sort();
+
+      // 2. Kirim ke FastAPI
+      const predictions = await Promise.all(
+        machineIds.map((id) => {
+          const s = latestPerMachine[id];
+          return fetch(`${API_URL}/predict`, {
+            method : "POST",
+            headers: { "Content-Type": "application/json" },
+            body   : JSON.stringify({
+              machine_id: s.machine_id,
+              temperature: s.temperature,
+              vibration: s.vibration,
+              pressure: s.pressure,
+              rpm: s.rpm,
+              power_consumption: s.power_consumption,
+              noise_level: s.noise_level,
+              humidity: s.humidity,
+              operating_hours: s.operating_hours,
+            }),
+          }).then(r => {
+            if (!r.ok) throw new Error(`FastAPI error ${r.status}`);
+            return r.json();
+          });
+        })
+      );
+
+      // 3. Simpan prediksi ke Supabase
+      await supabase.from("predictions").insert(
+        predictions.map(p => ({
+          machine_id: p.machine_id,
+          health_label: p.task_B.health_label,
+          health_score: healthScoreFromProb(p.task_B.probabilities),
+          failure_probability: p.task_A.failure_probability,
+          will_fail: p.task_A.will_fail_within_7days,
+          risk_level: p.task_A.risk_level,
+          recommendation: p.recommendation,
+        }))
+      );
+
+      // 4. Build rows
+      const rows: MachineRow[] = predictions.map((p, i) => ({
+        id: p.machine_id,
+        healthScore: healthScoreFromProb(p.task_B.probabilities),
+        healthLabel: p.task_B.health_label,
+        failureProb: p.task_A.failure_probability,
+        willFail: p.task_A.will_fail_within_7days,
+        riskLevel: p.task_A.risk_level,
+        recommendation: p.recommendation,
+        status: labelToStatus(p.task_B.health_label),
+        latestSensor: latestPerMachine[machineIds[i]] ?? null,
+      }));
+
+      setMachines(rows.sort((a, b) => a.healthScore - b.healthScore));
+
+      // 5. Sensor trend M-01
+      const m01 = (sensorData ?? [])
+        .filter(r => r.machine_id === "M-01")
+        .slice(0, 24)
+        .reverse();
+
+      setSensorTrend(m01.map(r => ({
+        label: new Date(r.timestamp).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
+        temperature: r.temperature,
+        vibration: r.vibration,
+        noise_level: r.noise_level,
+      })));
+
+      setLastUpdate(new Date().toLocaleTimeString("id-ID"));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Gagal fetch data");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAll();
+    const interval = setInterval(fetchAll, 60_000);
+    return () => clearInterval(interval);
+  }, [fetchAll]);
+
+  const criticalCount = machines.filter(m => m.status === "critical").length;
+  const willFailCount = machines.filter(m => m.willFail).length;
+  const avgHealth = machines.length
+    ? Math.round(machines.reduce((s, m) => s + m.healthScore, 0) / machines.length) : 0;
+  const mostCritical = machines[0];
+  const alerts = machines.filter(m => m.willFail || m.status !== "good");
+
   return (
     <div className="p-6">
       {/* Topbar */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-lg font-medium text-white">Predictive Maintenance Dashboard</h1>
-        <span className="bg-amber-400 text-amber-900 text-[11px] font-semibold px-3 py-1.5 rounded-full">
-          {alerts.length} alert aktif
-        </span>
+        <div>
+          <h1 className="text-lg font-medium text-white">Predictive Maintenance Dashboard</h1>
+          {lastUpdate && (
+            <p className="text-[11px] text-zinc-500 mt-0.5">
+              Data real dari Supabase · Update: {lastUpdate} ·{" "}
+              <button onClick={fetchAll} className="text-zinc-400 hover:text-white transition-colors underline underline-offset-2">
+                Refresh
+              </button>
+            </p>
+          )}
+        </div>
+        {loading ? <Skeleton className="w-24 h-7"/> :
+          alerts.length > 0 ? (
+            <span className="bg-amber-400 text-amber-900 text-[11px] font-semibold px-3 py-1.5 rounded-full">
+              {alerts.length} alert aktif
+            </span>
+          ) : (
+            <span className="bg-green-500/20 text-green-400 text-[11px] font-semibold px-3 py-1.5 rounded-full border border-green-500/30">
+              Semua normal
+            </span>
+          )
+        }
       </div>
+
+      {/* Error */}
+      {error && (
+        <div className="mb-4 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 flex items-center justify-between">
+          <div>
+            <p className="text-[12px] text-red-400 font-medium">Gagal terhubung</p>
+            <p className="text-[11px] text-red-400/70 mt-0.5">{error}</p>
+          </div>
+          <button onClick={fetchAll} className="text-[11px] text-red-400 border border-red-500/30 px-3 py-1.5 rounded-lg hover:bg-red-500/10 transition-colors">
+            Coba Lagi
+          </button>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-        {[
-          { label: "Total Mesin",      value: stats.totalMesin,      sub: "Semua terpantau",   color: "text-green-400" },
-          { label: "Status Kritis",    value: stats.statusKritis,    sub: "Perlu maintenance", color: "text-red-400"   },
-          { label: "Avg Health Score", value: `${stats.avgHealthScore}%`, sub: "Di bawah target",  color: "text-amber-400"},
-          { label: "RUL Terpendek",    value: stats.rulTerpendek,    sub: `${stats.rulMachine} segera cek`, color: "text-red-400" },
-        ].map((s) => (
-          <div key={s.label} className="bg-[#18191c] border border-white/5 rounded-xl p-4">
-            <p className="text-[11px] text-zinc-500 mb-1.5">{s.label}</p>
-            <p className="text-2xl font-medium text-white leading-none mb-1">{s.value}</p>
-            <p className={`text-[11px] ${s.color}`}>{s.sub}</p>
-          </div>
-        ))}
+        {loading ? Array.from({length:4}).map((_,i) => <Skeleton key={i} className="h-24 rounded-xl"/>) : (
+          <>
+            <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
+              <p className="text-[11px] text-zinc-500 mb-1.5">Total Mesin</p>
+              <p className="text-2xl font-medium text-white leading-none mb-1">{machines.length}</p>
+              <p className="text-[11px] text-green-400">Dari Supabase</p>
+            </div>
+            <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
+              <p className="text-[11px] text-zinc-500 mb-1.5">Status Kritis</p>
+              <p className={`text-2xl font-medium leading-none mb-1 ${criticalCount > 0 ? "text-red-400" : "text-white"}`}>{criticalCount}</p>
+              <p className="text-[11px] text-red-400">{criticalCount > 0 ? "Perlu maintenance" : "Tidak ada"}</p>
+            </div>
+            <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
+              <p className="text-[11px] text-zinc-500 mb-1.5">Avg Health Score</p>
+              <p className={`text-2xl font-medium leading-none mb-1 ${scoreColor(avgHealth)}`}>{avgHealth}%</p>
+              <p className="text-[11px] text-zinc-500">Dari model prediksi</p>
+            </div>
+            <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
+              <p className="text-[11px] text-zinc-500 mb-1.5">Akan Gagal 7 Hari</p>
+              <p className={`text-2xl font-medium leading-none mb-1 ${willFailCount > 0 ? "text-red-400" : "text-green-400"}`}>{willFailCount}</p>
+              <p className="text-[11px] text-zinc-500">{mostCritical ? `${mostCritical.id} paling kritis` : "-"}</p>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-        {/* Health Score */}
         <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
           <p className="text-[13px] font-medium text-zinc-300 mb-4">Health Score per Mesin</p>
-          {machines.map((m) => (
-            <Link key={m.id} href={`/machines/${m.id}`} className="block mb-3 group">
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-[12px] text-zinc-400 group-hover:text-white transition-colors">{m.id}</span>
-                <span className={`text-[11px] font-medium ${scoreColor(m.healthScore)}`}>{m.healthScore}% ●</span>
-              </div>
-              <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-                <div className={`h-full rounded-full ${barColor(m.healthScore)}`} style={{ width: `${m.healthScore}%` }}/>
-              </div>
-            </Link>
-          ))}
-          <div className="flex gap-4 mt-3">
-            <span className="text-[10px] text-red-400">M-01: 8.3 jam</span>
-            <span className="text-[10px] text-amber-400">M-02: 31 jam</span>
-            <span className="text-[10px] text-green-400">M-03: 120+ jam</span>
-          </div>
+          {loading ? (
+            <div className="flex flex-col gap-3">{Array.from({length:5}).map((_,i) => <Skeleton key={i} className="h-8"/>)}</div>
+          ) : (
+            machines.map((m) => (
+              <Link key={m.id} href={`/machines/${m.id}`} className="block mb-3 group">
+                <div className="flex justify-between items-center mb-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[12px] text-zinc-400 group-hover:text-white transition-colors">{m.id}</span>
+                    {m.willFail && (
+                      <span className="text-[9px] bg-red-500/20 text-red-400 border border-red-500/30 px-1.5 py-0.5 rounded font-medium">GAGAL 7D</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${riskBadge(m.riskLevel)}`}>{m.riskLevel}</span>
+                    <span className={`text-[11px] font-medium ${scoreColor(m.healthScore)}`}>{m.healthScore}%</span>
+                  </div>
+                </div>
+                <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full transition-all duration-700 ${barColor(m.healthScore)}`} style={{width:`${m.healthScore}%`}}/>
+                </div>
+                {m.latestSensor && (
+                  <p className="text-[10px] text-zinc-600 mt-1">
+                    Temp: {m.latestSensor.temperature}°C · Vib: {m.latestSensor.vibration} · RPM: {m.latestSensor.rpm}
+                  </p>
+                )}
+              </Link>
+            ))
+          )}
         </div>
 
-        {/* Sensor Trends */}
         <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
-          <p className="text-[13px] font-medium text-zinc-300 mb-4">Sensor Trends M-01</p>
-          <SensorChart />
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-[13px] font-medium text-zinc-300">Sensor Trends M-01</p>
+            <span className="text-[10px] text-zinc-500">Data real Supabase</span>
+          </div>
+          {loading ? <Skeleton className="h-40"/> : <SensorChart data={sensorTrend}/>}
           <div className="flex gap-4 mt-3">
-            {[
-              { label: "Temperature", color: "bg-red-500"   },
-              { label: "Vibration",   color: "bg-amber-400" },
-              { label: "Noise",       color: "bg-blue-500"  },
-            ].map((s) => (
+            {[{label:"Temperature",color:"bg-red-500"},{label:"Vibration×100",color:"bg-amber-400"},{label:"Noise",color:"bg-blue-500"}].map(s => (
               <span key={s.label} className="flex items-center gap-1.5 text-[10px] text-zinc-500">
                 <span className={`w-2.5 h-0.5 rounded-full ${s.color}`}/>
                 {s.label}
@@ -163,24 +354,39 @@ export default function DashboardPage() {
 
       {/* Alerts */}
       <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
-        <p className="text-[13px] font-medium text-zinc-300 mb-1">Alerts</p>
-        {alerts.map((a) => (
-          <div key={a.id} className="flex items-start justify-between py-3 border-b border-white/5 last:border-0">
-            <div className="flex items-start gap-3">
-              <div className={`w-[3px] h-9 rounded-full shrink-0 mt-0.5 ${a.severity === "CRITICAL" ? "bg-red-500" : "bg-amber-400"}`}/>
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${a.severity === "CRITICAL" ? "bg-red-500 text-white" : "bg-amber-400 text-amber-900"}`}>
-                    {a.severity}
-                  </span>
-                  <span className="text-[11px] text-zinc-400">{a.machine}</span>
-                </div>
-                <p className="text-[12px] text-zinc-500">{a.message}</p>
-              </div>
-            </div>
-            <span className="text-[11px] text-zinc-600 whitespace-nowrap ml-4 pt-0.5">{a.time}</span>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-[13px] font-medium text-zinc-300">Alerts dari Model Prediksi</p>
+          <span className="text-[10px] text-zinc-500">Real-time via FastAPI + Supabase</span>
+        </div>
+        {loading ? (
+          <div className="flex flex-col gap-2">{Array.from({length:2}).map((_,i) => <Skeleton key={i} className="h-14"/>)}</div>
+        ) : alerts.length === 0 ? (
+          <div className="py-6 text-center">
+            <p className="text-[13px] text-green-400 font-medium">✅ Tidak ada alert</p>
+            <p className="text-[11px] text-zinc-500 mt-1">Semua mesin dalam kondisi normal</p>
           </div>
-        ))}
+        ) : (
+          alerts.map((m) => (
+            <Link key={m.id} href={`/machines/${m.id}`} className="block">
+              <div className="flex items-start justify-between py-3 border-b border-white/5 last:border-0 hover:bg-white/[0.02] rounded-lg px-1 transition-colors">
+                <div className="flex items-start gap-3">
+                  <div className={`w-[3px] h-9 rounded-full shrink-0 mt-0.5 ${m.status === "critical" ? "bg-red-500" : "bg-amber-400"}`}/>
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${m.status === "critical" ? "bg-red-500 text-white" : "bg-amber-400 text-amber-900"}`}>
+                        {m.status === "critical" ? "CRITICAL" : "WARNING"}
+                      </span>
+                      <span className="text-[11px] text-zinc-400">{m.id}</span>
+                      <span className="text-[10px] text-zinc-600">Prob: {(m.failureProb * 100).toFixed(1)}%</span>
+                    </div>
+                    <p className="text-[12px] text-zinc-500">{m.recommendation}</p>
+                  </div>
+                </div>
+                <span className="text-[11px] text-zinc-600 whitespace-nowrap ml-4 pt-0.5">Health: {m.healthScore}%</span>
+              </div>
+            </Link>
+          ))
+        )}
       </div>
     </div>
   );

@@ -2,34 +2,63 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 const navItems = [
-  { label: "Dashboard", href: "/", icon: "⊞" },
-  { label: "Machines",  href: "/machines", icon: "⚙" },
-  { label: "Alerts",    href: "/alerts", icon: "🔔" },
-  { label: "History",   href: "/history", icon: "🕐" },
-  { label: "Cost Analysis", href: "/cost-analysis", icon: "$" },
+  { label: "Dashboard",    href: "/",             icon: "⊞" },
+  { label: "Machines",     href: "/machines",     icon: "⚙" },
+  { label: "Alerts",       href: "/alerts",       icon: "🔔" },
+  { label: "History",      href: "/history",      icon: "🕐" },
+  { label: "Cost Analysis",href: "/cost-analysis",icon: "$" },
 ];
 
-const machines = [
-  { id: "M-01", status: "critical" },
-  { id: "M-02", status: "warning" },
-  { id: "M-03", status: "good" },
-  { id: "M-04", status: "good" },
-];
+interface MachineStatus {
+  id: string;
+  status: "critical" | "warning" | "good";
+}
 
 function dotColor(status: string) {
   if (status === "critical") return "bg-red-500";
-  if (status === "warning") return "bg-amber-400";
+  if (status === "warning")  return "bg-amber-400";
   return "bg-green-500";
 }
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [machines, setMachines] = useState<MachineStatus[]>([]);
+
+  useEffect(() => {
+    async function fetchMachineStatuses() {
+      // Ambil prediksi terbaru per mesin dari Supabase
+      const { data } = await supabase
+        .from("predictions")
+        .select("machine_id, health_label, created_at")
+        .order("created_at", { ascending: false })
+        .limit(200);
+
+      if (!data) return;
+
+      // Ambil 1 prediksi terbaru per mesin
+      const latest: Record<string, string> = {};
+      for (const row of data) {
+        if (!latest[row.machine_id]) {
+          latest[row.machine_id] = row.health_label;
+        }
+      }
+
+      const rows: MachineStatus[] = Object.entries(latest)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([id, label]) => ({
+          id,
+          status: label === "Critical" ? "critical" : label === "Warning" ? "warning" : "good",
+        }));
+
+      setMachines(rows);
+    }
+
+    fetchMachineStatuses();
+  }, []);
 
   return (
     <div className="flex h-screen bg-[#111214] overflow-hidden">
@@ -60,24 +89,35 @@ export default function DashboardLayout({
           MESIN
         </p>
 
-        <div className="flex flex-col px-2">
-          {machines.map((m) => (
-            <Link
-            key={m.id}
-            href={`/machines/${m.id}`}
-            className={`flex items-center justify-between px-3 py-1.5 text-[12px] rounded-md transition-colors ${
-                pathname === `/machines/${m.id}`
-                ? "text-white bg-white/10"
-                : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5"
-            }`}
-            >
-              <span>{m.id}</span>
-              <span className={`w-2 h-2 rounded-full ${dotColor(m.status)}`} />
-            </Link>
-          ))}
+        {/* Machine list — scrollable */}
+        <div className="flex flex-col px-2 overflow-y-auto flex-1">
+          {machines.length === 0 ? (
+            // Skeleton loading
+            Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="flex items-center justify-between px-3 py-1.5">
+                <div className="w-10 h-3 bg-white/5 rounded animate-pulse"/>
+                <div className="w-2 h-2 rounded-full bg-white/5 animate-pulse"/>
+              </div>
+            ))
+            
+          ) : (
+            machines.map((m) => (
+              <Link
+                key={m.id}
+                href={`/machines/${m.id}`}
+                className={`flex items-center justify-between px-3 py-1.5 text-[12px] rounded-md transition-colors ${
+                  pathname === `/machines/${m.id}`
+                    ? "text-white bg-white/10"
+                    : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5"
+                }`}
+              >
+                <span>{m.id}</span>
+                <span className={`w-2 h-2 rounded-full ${dotColor(m.status)}`}/>
+              </Link>
+            ))
+          )}
         </div>
       </aside>
-
       {/* Main content */}
       <main className="flex-1 overflow-y-auto">
         {children}
@@ -85,3 +125,4 @@ export default function DashboardLayout({
     </div>
   );
 }
+

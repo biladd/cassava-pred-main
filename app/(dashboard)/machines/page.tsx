@@ -1,304 +1,290 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { supabase } from "@/lib/supabase";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 type MachineStatus = "critical" | "warning" | "good";
 
 interface Machine {
   id: string;
-  name: string;
-  type: string;
-  location: string;
   status: MachineStatus;
   healthScore: number;
-  rul: string;
-  lastMaintenance: string;
+  failureProb: number;
+  willFail: boolean;
+  riskLevel: string;
+  temperature: number;
+  vibration: number;
+  rpm: number;
+  lastTimestamp: string;
 }
 
-const defaultMachines: Machine[] = [
-  {
-    id: "M-01",
-    name: "Compressor A",
-    type: "Compressor",
-    location: "Line A",
-    status: "critical",
-    healthScore: 28,
-    rul: "8.3 jam",
-    lastMaintenance: "3 hari lalu",
-  },
-  {
-    id: "M-02",
-    name: "Conveyor B",
-    type: "Conveyor",
-    location: "Line B",
-    status: "warning",
-    healthScore: 61,
-    rul: "31 jam",
-    lastMaintenance: "5 hari lalu",
-  },
-  {
-    id: "M-03",
-    name: "Mixer C",
-    type: "Mixer",
-    location: "Line A",
-    status: "good",
-    healthScore: 91,
-    rul: "120+ jam",
-    lastMaintenance: "1 hari lalu",
-  },
-];
-
 function statusBadge(status: MachineStatus) {
-  if (status === "critical") {
-    return "bg-red-500/10 text-red-400 border border-red-500/20";
-  }
-
-  if (status === "warning") {
-    return "bg-amber-400/10 text-amber-400 border border-amber-400/20";
-  }
-
+  if (status === "critical") return "bg-red-500/10 text-red-400 border border-red-500/20";
+  if (status === "warning")  return "bg-amber-400/10 text-amber-400 border border-amber-400/20";
   return "bg-green-500/10 text-green-400 border border-green-500/20";
 }
 
 function statusLabel(status: MachineStatus) {
   if (status === "critical") return "Critical";
-  if (status === "warning") return "Warning";
-
+  if (status === "warning")  return "Warning";
   return "Normal";
 }
 
 function barColor(score: number) {
   if (score < 40) return "bg-red-500";
   if (score < 70) return "bg-amber-400";
-
   return "bg-green-500";
 }
 
+function scoreColor(score: number) {
+  if (score < 40) return "text-red-400";
+  if (score < 70) return "text-amber-400";
+  return "text-green-400";
+}
+
+function healthScoreFromProb(probs: { Healthy: number; Warning: number; Critical: number }) {
+  return Math.round(probs.Healthy * 100 + probs.Warning * 50);
+}
+
+function Skeleton({ className }: { className?: string }) {
+  return <div className={`animate-pulse bg-white/5 rounded ${className}`}/>;
+}
+
 export default function MachinesPage() {
-  const [machines, setMachines] =
-    useState<Machine[]>(defaultMachines);
+  const [machines, setMachines] = useState<Machine[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState<string | null>(null);
+  const [lastUpdate, setLastUpdate] = useState("");
+  const [search, setSearch]     = useState("");
 
-  const critical = machines.filter(
-    (m) => m.status === "critical"
-  ).length;
+  const fetchMachines = useCallback(async () => {
+    try {
+      setError(null);
 
-  const warning = machines.filter(
-    (m) => m.status === "warning"
-  ).length;
+      // 1. Ambil data sensor terbaru per mesin
+      const { data: sensorData, error: sErr } = await supabase
+        .from("sensor_readings")
+        .select("*")
+        .order("timestamp", { ascending: false })
+        .limit(2000);
 
-  // =========================
-  // IMPORT CSV
-  // =========================
-  const handleImportCSV = (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0];
+      if (sErr) throw new Error(`Supabase: ${sErr.message}`);
 
-    if (!file) return;
+      // Ambil 1 terbaru per mesin
+      const latest: Record<string, any> = {};
+      for (const row of (sensorData ?? [])) {
+        if (!latest[row.machine_id]) latest[row.machine_id] = row;
+      }
 
-    const reader = new FileReader();
+      const machineIds = Object.keys(latest).sort();
 
-    reader.onload = (e) => {
-      const text = e.target?.result as string;
+      // 2. Prediksi dari FastAPI
+      const predictions = await Promise.all(
+        machineIds.map(id => {
+          const s = latest[id];
+          return fetch(`${API_URL}/predict`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              machine_id: s.machine_id,
+              temperature: s.temperature,
+              vibration: s.vibration,
+              pressure: s.pressure,
+              rpm: s.rpm,
+              power_consumption: s.power_consumption,
+              noise_level: s.noise_level,
+              humidity: s.humidity,
+              operating_hours: s.operating_hours,
+            }),
+          }).then(r => r.json());
+        })
+      );
 
-      const rows = text.split("\n");
+      // 3. Build rows
+      const rows: Machine[] = predictions.map((p, i) => {
+        const s = latest[machineIds[i]];
+        const score = healthScoreFromProb(p.task_B.probabilities);
+        const label = p.task_B.health_label;
+        return {
+          id: p.machine_id,
+          status: label === "Critical" ? "critical" : label === "Warning" ? "warning" : "good",
+          healthScore: score,
+          failureProb: p.task_A.failure_probability,
+          willFail: p.task_A.will_fail_within_7days,
+          riskLevel: p.task_A.risk_level,
+          temperature: s.temperature,
+          vibration: s.vibration,
+          rpm: s.rpm,
+          lastTimestamp: new Date(s.timestamp).toLocaleDateString("id-ID"),
+        };
+      });
 
-      // remove header
-      rows.shift();
+      setMachines(rows);
+      setLastUpdate(new Date().toLocaleTimeString("id-ID"));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Gagal fetch data");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-      const importedMachines: Machine[] = rows
-        .filter((row) => row.trim() !== "")
-        .map((row) => {
-          const columns = row.split(",");
+  useEffect(() => {
+    fetchMachines();
+  }, [fetchMachines]);
 
-          return {
-            id: columns[0],
-            name: columns[1],
-            type: columns[2],
-            location: columns[3],
-            status: columns[4] as MachineStatus,
-            healthScore: Number(columns[5]),
-            rul: columns[6],
-            lastMaintenance: columns[7],
-          };
-        });
+  const filtered = machines.filter(m =>
+    m.id.toLowerCase().includes(search.toLowerCase())
+  );
 
-      setMachines((prev) => [
-        ...prev,
-        ...importedMachines,
-      ]);
-    };
-
-    reader.readAsText(file);
-  };
+  const criticalCount = machines.filter(m => m.status === "critical").length;
+  const warningCount  = machines.filter(m => m.status === "warning").length;
+  const willFailCount = machines.filter(m => m.willFail).length;
 
   return (
-    <div className="p-6 min-h-screen bg-black">
-      {/* HEADER */}
+    <div className="p-6">
+      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-lg font-medium text-white">
-            Machines
-          </h1>
-
-          <p className="text-[12px] text-zinc-500 mt-0.5">
-            {machines.length} mesin terpantau ·{" "}
-            {critical} critical · {warning} warning
-          </p>
+          <h1 className="text-lg font-medium text-white">Machines</h1>
+          {lastUpdate ? (
+            <p className="text-[12px] text-zinc-500 mt-0.5">
+              {machines.length} mesin · {criticalCount} critical · {warningCount} warning · {willFailCount} akan gagal 7 hari ·{" "}
+              <button onClick={fetchMachines} className="text-zinc-400 hover:text-white underline underline-offset-2 transition-colors">
+                Refresh
+              </button>
+            </p>
+          ) : (
+            <p className="text-[12px] text-zinc-500 mt-0.5">Memuat data...</p>
+          )}
         </div>
 
-        {/* IMPORT BUTTON */}
-        <label
-          className="
-            cursor-pointer
-            px-4
-            py-2
-            rounded-lg
-            bg-cyan-500
-            text-black
-            text-sm
-            font-medium
-            hover:opacity-80
-            transition
-          "
-        >
-          Import CSV
-
-          <input
-            type="file"
-            accept=".csv"
-            onChange={handleImportCSV}
-            className="hidden"
-          />
-        </label>
+        {/* Search */}
+        <input
+          type="text"
+          placeholder="Cari mesin..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[12px] text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-white/20 w-40"
+        />
       </div>
 
-      {/* TABLE */}
+      {/* Error */}
+      {error && (
+        <div className="mb-4 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 flex items-center justify-between">
+          <p className="text-[12px] text-red-400">{error}</p>
+          <button onClick={fetchMachines} className="text-[11px] text-red-400 border border-red-500/30 px-3 py-1.5 rounded-lg hover:bg-red-500/10">
+            Coba Lagi
+          </button>
+        </div>
+      )}
+
+      {/* Stats */}
+      <div className="grid grid-cols-4 gap-3 mb-5">
+        {[
+          { label: "Total Mesin",     value: machines.length, color: "text-white"    },
+          { label: "Critical",        value: criticalCount,   color: "text-red-400"  },
+          { label: "Warning",         value: warningCount,    color: "text-amber-400"},
+          { label: "Akan Gagal 7 Hari", value: willFailCount, color: "text-red-400" },
+        ].map(s => (
+          <div key={s.label} className="bg-[#18191c] border border-white/5 rounded-xl p-4">
+            <p className="text-[11px] text-zinc-500 mb-1">{s.label}</p>
+            {loading ? <Skeleton className="h-7 w-12"/> :
+              <p className={`text-2xl font-medium ${s.color}`}>{s.value}</p>
+            }
+          </div>
+        ))}
+      </div>
+
+      {/* Table */}
       <div className="bg-[#18191c] border border-white/5 rounded-xl overflow-hidden">
         <table className="w-full">
           <thead>
             <tr className="border-b border-white/5">
-              {[
-                "ID",
-                "Nama",
-                "Tipe",
-                "Lokasi",
-                "Status",
-                "Health Score",
-                "RUL",
-                "Maintenance Terakhir",
-              ].map((h) => (
-                <th
-                  key={h}
-                  className="text-left text-[11px] font-medium text-zinc-500 px-4 py-3"
-                >
-                  {h}
-                </th>
+              {["ID","Status","Health Score","Failure Prob","Risk","Temp (°C)","Vibration","RPM","Data Terakhir"].map(h => (
+                <th key={h} className="text-left text-[11px] font-medium text-zinc-500 px-4 py-3">{h}</th>
               ))}
             </tr>
           </thead>
-
           <tbody>
-            {machines.map((m) => (
-              <tr
-                key={m.id}
-                className="
-                  border-b
-                  border-white/5
-                  last:border-0
-                  hover:bg-white/5
-                  transition-colors
-                "
-              >
+            {loading ? (
+              Array.from({length: 8}).map((_, i) => (
+                <tr key={i} className="border-b border-white/5">
+                  {Array.from({length: 9}).map((_, j) => (
+                    <td key={j} className="px-4 py-3"><Skeleton className="h-4 w-full"/></td>
+                  ))}
+                </tr>
+              ))
+            ) : filtered.map(m => (
+              <tr key={m.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02] transition-colors">
                 {/* ID */}
                 <td className="px-4 py-3">
-                  <Link
-                    href={`/machines/${m.id}`}
-                    className="
-                      text-[13px]
-                      font-medium
-                      text-blue-400
-                      hover:text-blue-300
-                    "
-                  >
-                    {m.id}
-                  </Link>
+                  <div className="flex items-center gap-2">
+                    <Link href={`/machines/${m.id}`} className="text-[13px] font-medium text-blue-400 hover:text-blue-300">
+                      {m.id}
+                    </Link>
+                    {m.willFail && (
+                      <span className="text-[9px] bg-red-500/20 text-red-400 border border-red-500/30 px-1.5 py-0.5 rounded font-medium">7D</span>
+                    )}
+                  </div>
                 </td>
 
-                {/* NAME */}
-                <td className="px-4 py-3 text-[13px] text-zinc-300">
-                  {m.name}
-                </td>
-
-                {/* TYPE */}
-                <td className="px-4 py-3 text-[12px] text-zinc-500">
-                  {m.type}
-                </td>
-
-                {/* LOCATION */}
-                <td className="px-4 py-3 text-[12px] text-zinc-500">
-                  {m.location}
-                </td>
-
-                {/* STATUS */}
+                {/* Status */}
                 <td className="px-4 py-3">
-                  <span
-                    className={`
-                      text-[11px]
-                      font-medium
-                      px-2
-                      py-0.5
-                      rounded-full
-                      ${statusBadge(m.status)}
-                    `}
-                  >
+                  <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${statusBadge(m.status)}`}>
                     {statusLabel(m.status)}
                   </span>
                 </td>
 
-                {/* HEALTH */}
+                {/* Health Score */}
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
                     <div className="w-16 h-1.5 bg-white/5 rounded-full overflow-hidden">
-                      <div
-                        className={`
-                          h-full
-                          rounded-full
-                          ${barColor(m.healthScore)}
-                        `}
-                        style={{
-                          width: `${m.healthScore}%`,
-                        }}
-                      />
+                      <div className={`h-full rounded-full ${barColor(m.healthScore)}`} style={{width:`${m.healthScore}%`}}/>
                     </div>
-
-                    <span className="text-[12px] text-zinc-400">
-                      {m.healthScore}%
-                    </span>
+                    <span className={`text-[12px] ${scoreColor(m.healthScore)}`}>{m.healthScore}%</span>
                   </div>
                 </td>
 
-                {/* RUL */}
-                <td className="px-4 py-3 text-[12px] text-zinc-400">
-                  {m.rul}
+                {/* Failure Prob */}
+                <td className="px-4 py-3">
+                  <span className={`text-[12px] ${m.failureProb >= 0.5 ? "text-red-400" : m.failureProb >= 0.2 ? "text-amber-400" : "text-zinc-400"}`}>
+                    {(m.failureProb * 100).toFixed(1)}%
+                  </span>
                 </td>
 
-                {/* LAST MAINTENANCE */}
-                <td className="px-4 py-3 text-[12px] text-zinc-500">
-                  {m.lastMaintenance}
+                {/* Risk */}
+                <td className="px-4 py-3">
+                  <span className={`text-[11px] px-1.5 py-0.5 rounded font-medium ${
+                    m.riskLevel === "HIGH" ? "bg-red-500/20 text-red-400" :
+                    m.riskLevel === "MEDIUM" ? "bg-amber-400/20 text-amber-400" :
+                    "bg-green-500/20 text-green-400"
+                  }`}>{m.riskLevel}</span>
                 </td>
+
+                {/* Temp */}
+                <td className="px-4 py-3 text-[12px] text-zinc-400">{m.temperature.toFixed(1)}</td>
+
+                {/* Vibration */}
+                <td className="px-4 py-3 text-[12px] text-zinc-400">{m.vibration.toFixed(2)}</td>
+
+                {/* RPM */}
+                <td className="px-4 py-3 text-[12px] text-zinc-400">{m.rpm}</td>
+
+                {/* Last data */}
+                <td className="px-4 py-3 text-[12px] text-zinc-500">{m.lastTimestamp}</td>
               </tr>
             ))}
           </tbody>
         </table>
-      </div>
 
-      {/* FORMAT INFO */}
-      <div className="mt-4 text-[12px] text-zinc-500">
-        Format CSV:
-        <br />
-        id,name,type,location,status,healthScore,rul,lastMaintenance
+        {!loading && filtered.length === 0 && (
+          <div className="py-8 text-center text-[12px] text-zinc-500">
+            Tidak ada mesin ditemukan
+          </div>
+        )}
       </div>
     </div>
   );

@@ -19,6 +19,23 @@ interface Machine {
   vibration: number;
   rpm: number;
   lastTimestamp: string;
+  rulHours: number;      
+  rulCapped: boolean;     
+  isAnomaly: boolean;    
+  anomalyScore: number;   
+}
+
+interface SensorReading {
+  machine_id: string;
+  timestamp: string;
+  temperature: number;
+  vibration: number;
+  pressure: number;
+  rpm: number;
+  power_consumption: number;
+  noise_level: number;
+  humidity: number;
+  operating_hours: number;
 }
 
 function statusBadge(status: MachineStatus) {
@@ -74,7 +91,7 @@ export default function MachinesPage() {
       if (sErr) throw new Error(`Supabase: ${sErr.message}`);
 
       // Ambil 1 terbaru per mesin
-      const latest: Record<string, any> = {};
+      const latest: Record<string, SensorReading> = {};
       for (const row of (sensorData ?? [])) {
         if (!latest[row.machine_id]) latest[row.machine_id] = row;
       }
@@ -85,7 +102,7 @@ export default function MachinesPage() {
       const predictions = await Promise.all(
         machineIds.map(id => {
           const s = latest[id];
-          return fetch(`${API_URL}/predict`, {
+          return fetch(`${API_URL}/predict/full`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -105,22 +122,25 @@ export default function MachinesPage() {
 
       // 3. Build rows
       const rows: Machine[] = predictions.map((p, i) => {
-        const s = latest[machineIds[i]];
-        const score = healthScoreFromProb(p.task_B.probabilities);
-        const label = p.task_B.health_label;
-        return {
-          id: p.machine_id,
-          status: label === "Critical" ? "critical" : label === "Warning" ? "warning" : "good",
-          healthScore: score,
-          failureProb: p.task_A.failure_probability,
-          willFail: p.task_A.will_fail_within_7days,
-          riskLevel: p.task_A.risk_level,
-          temperature: s.temperature,
-          vibration: s.vibration,
-          rpm: s.rpm,
-          lastTimestamp: new Date(s.timestamp).toLocaleDateString("id-ID"),
-        };
-      });
+      const s = latest[machineIds[i]];
+      const label = p.task_B.health_label;
+      return {
+        id: p.machine_id,
+        status: label === "Critical" ? "critical" : label === "Warning" ? "warning" : "good",
+        healthScore: p.overall_health_score ?? healthScoreFromProb(p.task_B.probabilities),
+        failureProb: p.task_A.failure_probability,
+        willFail: p.task_A.will_fail_within_7days,
+        riskLevel: p.task_A.risk_level,
+        temperature: s.temperature,
+        vibration: s.vibration,
+        rpm: s.rpm,
+        lastTimestamp: new Date(s.timestamp).toLocaleDateString("id-ID"),
+        rulHours: p.task_C?.rul_hours ?? 168,                       
+        rulCapped: p.task_C?.rul_capped ?? false,                   
+        isAnomaly: p.anomaly?.is_anomaly ?? false,                  
+        anomalyScore: p.anomaly?.score ?? 0,                        
+      };
+    });
 
       setMachines(rows);
       setLastUpdate(new Date().toLocaleTimeString("id-ID"));
@@ -132,8 +152,9 @@ export default function MachinesPage() {
   }, []);
 
   useEffect(() => {
-    fetchMachines();
-  }, [fetchMachines]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  fetchMachines();
+}, [fetchMachines]);
 
   const filtered = machines.filter(m =>
     m.id.toLowerCase().includes(search.toLowerCase())
@@ -203,7 +224,7 @@ export default function MachinesPage() {
         <table className="w-full">
           <thead>
             <tr className="border-b border-white/5">
-              {["ID","Status","Health Score","Failure Prob","Risk","Temp (°C)","Vibration","RPM","Data Terakhir"].map(h => (
+              {["ID","Status","Health Score","Failure Prob","Risk","RUL","Anomaly","Temp (°C)","Vibration","RPM","Data Terakhir"].map(h => (
                 <th key={h} className="text-left text-[11px] font-medium text-zinc-500 px-4 py-3">{h}</th>
               ))}
             </tr>
@@ -212,7 +233,7 @@ export default function MachinesPage() {
             {loading ? (
               Array.from({length: 8}).map((_, i) => (
                 <tr key={i} className="border-b border-white/5">
-                  {Array.from({length: 9}).map((_, j) => (
+                  {Array.from({length: 11}).map((_, j) => (
                     <td key={j} className="px-4 py-3"><Skeleton className="h-4 w-full"/></td>
                   ))}
                 </tr>
@@ -262,6 +283,32 @@ export default function MachinesPage() {
                     m.riskLevel === "MEDIUM" ? "bg-amber-400/20 text-amber-400" :
                     "bg-green-500/20 text-green-400"
                   }`}>{m.riskLevel}</span>
+                </td>
+
+                {/* RUL */}                                                    {/* ⭐ NEW */}
+                <td className="px-4 py-3">
+                  <span className={`text-[12px] ${
+                    m.rulHours < 24 ? "text-red-500" :
+                    m.rulHours < 72 ? "text-red-400" :
+                    m.rulHours < 168 ? "text-amber-400" :
+                    "text-green-400"
+                  }`}>
+                    {m.rulHours}j{m.rulCapped ? " (max)" : ""}
+                  </span>
+                </td>
+
+                {/* Anomaly */}                                                {/* ⭐ NEW */}
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-1.5">
+                    <span className={`text-[12px] ${m.isAnomaly ? "text-purple-400" : "text-zinc-500"}`}>
+                      {m.anomalyScore.toFixed(2)}
+                    </span>
+                    {m.isAnomaly && (
+                      <span className="text-[9px] bg-purple-500/20 text-purple-400 border border-purple-500/30 px-1.5 py-0.5 rounded font-medium">
+                        ANOM
+                      </span>
+                    )}
+                  </div>
                 </td>
 
                 {/* Temp */}

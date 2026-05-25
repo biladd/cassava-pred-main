@@ -31,6 +31,21 @@ interface MachineDetail {
   riskLevel: string;
   recommendation: string;
   healthLabel: string;
+
+  // Task B probabilities (⭐ NEW)
+  probHealthy: number;
+  probWarning: number;
+  probCritical: number;
+
+  // Task C — LSTM RUL (⭐ NEW)
+  rulHours: number;
+  rulDays: number;
+  rulCapped: boolean;
+
+  // Anomaly — IsolationForest (⭐ NEW)
+  isAnomaly: boolean;
+  anomalyScore: number;
+
   // sensor terbaru
   temperature: number;
   vibration: number;
@@ -41,11 +56,36 @@ interface MachineDetail {
   humidity: number;
   operating_hours: number;
   lastTimestamp: string;
+
   // maintenance
   maintenanceCount: number;
   emergencyCount: number;
   lastMaintenance: string;
   history: MaintenanceRecord[];
+
+ // ⭐ Extended dengan data real dari Supabase (notebook Tahap 3)
+  nlp: {
+    totalLogs: number;
+    emergencyCount: number;
+    correctiveCount: number;
+    preventiveCount: number;
+    avgDowntime: number;
+    totalCost: number;
+    daysSinceLastMaint: number;
+    hasUrgentRecent: boolean;
+
+    // ⭐ NEW: dari Supabase nlp_sentiment_summary
+    avgSeverity: number;
+    maxSeverity: number;
+    riskLevel: string;
+    urgentRate: number;
+    dominantTopic: number;
+    avgTechTerms: number;
+    avgProblemKw: number;
+
+    // ⭐ NEW: dari Supabase nlp_summary_keywords
+    topKeywords: { keyword: string; score: number }[];
+  };
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -155,6 +195,8 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
   const [sensorTrend, setSensorTrend] = useState<SensorTrend[]>([]);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState<string | null>(null);
+  const [historyPage, setHistoryPage] = useState(1);  // ⭐ NEW: pagination state
+
 
   const fetchDetail = useCallback(async () => {
     try {
@@ -174,7 +216,7 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
       const latest = sensorData[0];
 
       // 2. Prediksi dari FastAPI
-      const predRes = await fetch(`${API_URL}/predict`, {
+      const predRes = await fetch(`${API_URL}/predict/full`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -192,13 +234,34 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
       if (!predRes.ok) throw new Error(`FastAPI error ${predRes.status}`);
       const pred = await predRes.json();
 
-      // 3. Ambil maintenance logs
+      // 3. Ambil maintenance logs (semua history, max 100)
       const { data: maintData } = await supabase
         .from("maintenance_logs")
         .select("*")
         .eq("machine_id", id)
         .order("date", { ascending: false })
-        .limit(10);
+        .limit(100);
+
+        // ⭐ NEW: Fetch NLP sentiment summary dari Supabase (data Tahap 3 NLP)
+      const { data: nlpSentiment } = await supabase
+        .from("nlp_sentiment_summary")
+        .select("*")
+        .eq("machine_id", id)
+        .single();
+
+      //  NEW: Fetch top 5 keywords dari Supabase
+      const { data: nlpKeywords } = await supabase
+        .from("nlp_summary_keywords")
+        .select("keyword, tfidf_score, rank")
+        .eq("machine_id", id)
+        .order("rank", { ascending: true });
+        
+        //  NEW: Fetch maintenance summary (action counts, cost, downtime) dari notebook
+      const { data: nlpActions } = await supabase
+        .from("nlp_top_actions")
+        .select("*")
+        .eq("machine_id", id)
+        .single();
 
       const history: MaintenanceRecord[] = (maintData ?? []).map(m => ({
         date    : new Date(m.date).toLocaleDateString("id-ID"),
@@ -213,18 +276,52 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
         ? new Date(maintData[0].date).toLocaleDateString("id-ID")
         : "Belum ada data";
 
-      const score = healthScoreFromProb(pred.task_B.probabilities);
       const label = pred.task_B.health_label;
+
+      // ⭐ Hitung NLP summary dari maintenance_logs
+      const allLogs = maintData ?? [];
+      const correctiveCount = allLogs.filter(m => m.maintenance_type === "Corrective").length;
+      const preventiveCount = allLogs.filter(m => m.maintenance_type === "Preventive").length;
+      const totalDowntime = allLogs.reduce((s, m) => s + (Number(m.downtime_hours) || 0), 0);
+      const totalCost = allLogs.reduce((s, m) => s + (Number(m.cost_idr) || 0), 0);
+      const avgDowntime = allLogs.length ? totalDowntime / allLogs.length : 0;
+
+      // Days since last maintenance
+      const daysSince = allLogs[0]
+        ? Math.floor((Date.now() - new Date(allLogs[0].date).getTime()) / (1000 * 60 * 60 * 24))
+        : -1;
+
+      // Urgent flag = ada Emergency dalam 30 hari terakhir
+      const hasUrgentRecent = allLogs.some(m => {
+        if (m.maintenance_type !== "Emergency") return false;
+        const daysAgo = (Date.now() - new Date(m.date).getTime()) / (1000 * 60 * 60 * 24);
+        return daysAgo <= 30;
+      });
 
       setMachine({
         id,
         status       : label === "Critical" ? "critical" : label === "Warning" ? "warning" : "good",
-        healthScore  : score,
+        healthScore  : pred.overall_health_score ?? healthScoreFromProb(pred.task_B.probabilities),
         failureProb  : pred.task_A.failure_probability,
         willFail     : pred.task_A.will_fail_within_7days,
         riskLevel    : pred.task_A.risk_level,
         recommendation: pred.recommendation,
         healthLabel  : label,
+
+        // ⭐ Task B probabilities
+        probHealthy : pred.task_B.probabilities.Healthy,
+        probWarning : pred.task_B.probabilities.Warning,
+        probCritical: pred.task_B.probabilities.Critical,
+
+        // ⭐ Task C
+        rulHours    : pred.task_C?.rul_hours ?? 168,
+        rulDays     : pred.task_C?.rul_days ?? 7,
+        rulCapped   : pred.task_C?.rul_capped ?? false,
+
+        // ⭐ Anomaly
+        isAnomaly   : pred.anomaly?.is_anomaly ?? false,
+        anomalyScore: pred.anomaly?.score ?? 0,
+
         temperature  : latest.temperature,
         vibration    : latest.vibration,
         pressure     : latest.pressure,
@@ -234,11 +331,45 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
         humidity     : latest.humidity,
         operating_hours: latest.operating_hours,
         lastTimestamp: new Date(latest.timestamp).toLocaleString("id-ID"),
-        maintenanceCount: (maintData ?? []).length,
+        maintenanceCount: nlpActions?.total_logs ?? allLogs.length,
         emergencyCount,
-        lastMaintenance: lastMaint,
+        lastMaintenance: nlpActions?.emergency_count ?? emergencyCount,
         history,
+
+        // ⭐ NLP summary — pakai data REAL dari notebook Tahap 3 (Supabase tables)
+        nlp: {
+          // ⭐ FIX: Pakai data dari nlp_top_actions (semua history) bukan allLogs (limit 10)
+          totalLogs: nlpActions?.total_logs ?? allLogs.length,
+          emergencyCount: nlpActions?.emergency_count ?? emergencyCount,
+          correctiveCount: nlpActions?.corrective_count ?? correctiveCount,
+          preventiveCount: nlpActions?.preventive_count ?? preventiveCount,
+          avgDowntime: nlpActions?.avg_downtime_hrs ?? avgDowntime,
+          totalCost: nlpActions?.total_cost_idr ?? totalCost,
+
+          // Yang berikut dihitung dari allLogs (limit 10) — untuk "30 hari terakhir"
+          daysSinceLastMaint: daysSince,
+          hasUrgentRecent,
+
+          // Dari nlp_sentiment_summary (notebook Tahap 3)
+          avgSeverity: nlpSentiment?.avg_severity ?? 0,
+          maxSeverity: nlpSentiment?.max_severity ?? 0,
+          riskLevel: nlpSentiment?.risk_level ?? "Unknown",
+          urgentRate: nlpSentiment?.urgent_rate ?? 0,
+          dominantTopic: nlpSentiment?.dominant_topic ?? 0,
+          avgTechTerms: nlpSentiment?.avg_tech_terms ?? 0,
+          avgProblemKw: nlpSentiment?.avg_problem_kw ?? 0,
+
+          // Dari nlp_summary_keywords (notebook Tahap 3)
+          topKeywords: (nlpKeywords ?? []).map(k => ({
+            keyword: k.keyword,
+            score: k.tfidf_score
+          })),
+        },
       });
+
+      // Debug — hapus setelah konfirm data masuk
+      console.log("NLP Sentiment:", nlpSentiment);
+      console.log("NLP Keywords:", nlpKeywords);
 
       // 4. Sensor trend (24 data terakhir, dibalik)
       setSensorTrend(
@@ -257,7 +388,10 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
     }
   }, [id]);
 
-  useEffect(() => { fetchDetail(); }, [fetchDetail]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchDetail();
+  }, [fetchDetail]);
 
   // ── Loading ──
   if (loading) return (
@@ -286,6 +420,14 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
       </div>
     </div>
   );
+
+  // ⭐ Pagination logic untuk Maintenance History
+  const HISTORY_PAGE_SIZE = 10;
+  const totalHistoryPages = Math.max(1, Math.ceil(machine.history.length / HISTORY_PAGE_SIZE));
+  const currentHistoryPage = Math.min(historyPage, totalHistoryPages);
+  const historyStart = (currentHistoryPage - 1) * HISTORY_PAGE_SIZE;
+  const historyEnd = historyStart + HISTORY_PAGE_SIZE;
+  const paginatedHistory = machine.history.slice(historyStart, historyEnd);
 
   return (
     <div className="p-6">
@@ -321,7 +463,7 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
       </p>
 
       {/* Top stats */}
-      <div className="grid grid-cols-3 gap-3 mb-5">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
         <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
           <p className="text-[11px] text-zinc-500 mb-1">Health Score</p>
           <p className={`text-2xl font-medium ${scoreColor(machine.healthScore)}`}>{machine.healthScore}%</p>
@@ -329,17 +471,48 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
             <div className={`h-full rounded-full ${barColor(machine.healthScore)}`} style={{width:`${machine.healthScore}%`}}/>
           </div>
         </div>
+
         <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
-          <p className="text-[11px] text-zinc-500 mb-1">Failure Probability</p>
+          <p className="text-[11px] text-zinc-500 mb-1">Failure Prob (Task A)</p>
           <p className={`text-2xl font-medium ${machine.failureProb >= 0.5 ? "text-red-400" : machine.failureProb >= 0.2 ? "text-amber-400" : "text-green-400"}`}>
             {(machine.failureProb * 100).toFixed(1)}%
           </p>
-          <p className="text-[11px] text-zinc-500 mt-1">Risk: <span className={machine.riskLevel === "HIGH" ? "text-red-400" : machine.riskLevel === "MEDIUM" ? "text-amber-400" : "text-green-400"}>{machine.riskLevel}</span></p>
+          <p className="text-[11px] text-zinc-500 mt-1">
+            Risk: <span className={machine.riskLevel === "HIGH" ? "text-red-400" : machine.riskLevel === "MEDIUM" ? "text-amber-400" : "text-green-400"}>{machine.riskLevel}</span>
+          </p>
         </div>
+
+        {/* ⭐ NEW: RUL Card */}
+        <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
+          <p className="text-[11px] text-zinc-500 mb-1">RUL (Task C)</p>
+          <p className={`text-2xl font-medium ${
+            machine.rulHours < 24 ? "text-red-500" :
+            machine.rulHours < 72 ? "text-red-400" :
+            machine.rulHours < 168 ? "text-amber-400" :
+            "text-green-400"
+          }`}>
+            {machine.rulDays.toFixed(1)}d
+          </p>
+          <p className="text-[11px] text-zinc-500 mt-1">
+            {machine.rulHours}j{machine.rulCapped ? " (max)" : ""}
+          </p>
+        </div>
+
+        {/* ⭐ NEW: Anomaly Card */}
+        <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
+          <p className="text-[11px] text-zinc-500 mb-1">Anomaly</p>
+          <p className={`text-2xl font-medium ${machine.isAnomaly ? "text-purple-400" : "text-green-400"}`}>
+            {machine.anomalyScore.toFixed(2)}
+          </p>
+          <p className="text-[11px] text-zinc-500 mt-1">
+            {machine.isAnomaly ? <span className="text-purple-400">Detected</span> : "Normal"}
+          </p>
+        </div>
+
         <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
           <p className="text-[11px] text-zinc-500 mb-1">Maintenance</p>
-          <p className="text-2xl font-medium text-white">{machine.maintenanceCount}x</p>
-          <p className="text-[11px] text-red-400">{machine.emergencyCount} emergency</p>
+          <p className="text-2xl font-medium text-white">{machine.nlp.totalLogs}x</p>
+          <p className="text-[11px] text-red-400">{machine.nlp.emergencyCount} emergency</p>
         </div>
       </div>
 
@@ -362,76 +535,540 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
         ))}
       </div>
 
+      
+
       {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-        {/* Sensor Trend */}
-        <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
-          <p className="text-[13px] font-medium text-zinc-300 mb-4">Sensor Trend (24 data terakhir)</p>
-          <SensorChart data={sensorTrend}/>
-          <div className="flex gap-4 mt-3">
-            {[{label:"Temperature",color:"bg-red-500"},{label:"Vibration×100",color:"bg-amber-400"},{label:"Noise",color:"bg-blue-500"}].map(s => (
-              <span key={s.label} className="flex items-center gap-1.5 text-[10px] text-zinc-500">
-                <span className={`w-2.5 h-0.5 ${s.color}`}/>
-                {s.label}
-              </span>
-            ))}
-          </div>
+<div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+  {/* Sensor Trend */}
+  <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
+    <p className="text-[13px] font-medium text-zinc-300 mb-4">Sensor Trend (24 data terakhir)</p>
+    <SensorChart data={sensorTrend}/>
+    <div className="flex gap-4 mt-3">
+      {[
+        { label: "Temperature", color: "bg-red-500" },
+        { label: "Vibration×100", color: "bg-amber-400" },
+        { label: "Noise", color: "bg-blue-500" },
+      ].map(s => (
+        <span key={s.label} className="flex items-center gap-1.5 text-[10px] text-zinc-500">
+          <span className={`w-2.5 h-0.5 ${s.color}`}/>
+          {s.label}
+        </span>
+      ))}
+    </div>
+  </div>
+
+  {/* Failure Prediction (Gauge) */}
+  <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
+    <p className="text-[13px] font-medium text-zinc-300 mb-3">Failure Prediction</p>
+    <div className="flex items-center gap-4">
+      <Gauge score={machine.healthScore}/>
+      <div>
+        <p className={`text-[13px] font-semibold mb-1 ${scoreColor(machine.healthScore)}`}>{machine.healthLabel}</p>
+        <p className="text-[11px] text-zinc-500">Prob gagal: <span className="text-red-400">{(machine.failureProb * 100).toFixed(1)}%</span></p>
+        <p className="text-[11px] text-zinc-500 mt-1">
+          Risk:{" "}
+          <span className={machine.riskLevel === "HIGH" ? "text-red-400" : machine.riskLevel === "MEDIUM" ? "text-amber-400" : "text-green-400"}>
+            {machine.riskLevel}
+          </span>
+        </p>
+        {machine.willFail && <p className="text-[11px] text-red-400 font-semibold mt-1">⚠️ Akan gagal 7 hari!</p>}
+      </div>
+    </div>
+  </div>
+</div>  {/* ← TUTUP grid Charts di sini */}
+
+{/* Detail Output Model AI — full width */}
+<div className="bg-[#18191c] border border-white/5 rounded-xl p-5 mb-4">
+  <p className="text-[13px] font-medium text-zinc-300 mb-4">Detail Output Model </p>
+  <div className="space-y-4">
+
+    {/* Task A */}
+    <div>
+      <div className="flex justify-between items-center mb-1.5">
+        <span className="text-[11px] text-zinc-400">Task A · Failure Probability (Random Forest)</span>
+        <span className={`text-[11px] font-semibold ${machine.failureProb >= 0.5 ? "text-red-400" : machine.failureProb >= 0.2 ? "text-amber-400" : "text-green-400"}`}>
+          {(machine.failureProb * 100).toFixed(1)}% · {machine.riskLevel}
+        </span>
+      </div>
+      <div className="h-2 bg-white/5 rounded-full overflow-hidden relative">
+        <div className="absolute top-0 bottom-0 w-px bg-amber-500/60" style={{ left: "20%" }}/>
+        <div className="absolute top-0 bottom-0 w-px bg-red-500/60" style={{ left: "50%" }}/>
+        <div
+          className={`h-full transition-all duration-500 ${machine.failureProb >= 0.5 ? "bg-red-500" : machine.failureProb >= 0.2 ? "bg-amber-400" : "bg-green-500"}`}
+          style={{ width: `${machine.failureProb * 100}%` }}
+        />
+      </div>
+      <div className="flex justify-between text-[9px] text-zinc-600 mt-1">
+        <span>0%</span><span>20% (thr)</span><span>50% (high)</span><span>100%</span>
+      </div>
+    </div>
+
+    {/* Task B */}
+    <div>
+      <div className="flex justify-between items-center mb-1.5">
+        <span className="text-[11px] text-zinc-400">Task B · Health Status Distribution (Random Forest)</span>
+        <span className="text-[11px] text-zinc-500">{machine.healthLabel}</span>
+      </div>
+      <div className="h-3 rounded-full overflow-hidden flex">
+        <div className="bg-green-500" style={{ width: `${machine.probHealthy * 100}%` }}/>
+        <div className="bg-amber-400" style={{ width: `${machine.probWarning * 100}%` }}/>
+        <div className="bg-red-500" style={{ width: `${machine.probCritical * 100}%` }}/>
+      </div>
+      <div className="flex justify-between text-[9px] mt-1">
+        <span className="text-green-500">● Healthy {(machine.probHealthy * 100).toFixed(0)}%</span>
+        <span className="text-amber-400">● Warning {(machine.probWarning * 100).toFixed(0)}%</span>
+        <span className="text-red-500">● Critical {(machine.probCritical * 100).toFixed(0)}%</span>
+      </div>
+    </div>
+
+    {/* Task C */}
+    <div>
+      <div className="flex justify-between items-center mb-1.5">
+        <span className="text-[11px] text-zinc-400">Task C · Remaining Useful Life (LSTM)</span>
+        <span className={`text-[11px] font-semibold ${machine.rulHours < 24 ? "text-red-500" : machine.rulHours < 72 ? "text-red-400" : machine.rulHours < 168 ? "text-amber-400" : "text-green-400"}`}>
+          {machine.rulHours}j ({machine.rulDays.toFixed(1)}d) {machine.rulCapped && "· capped"}
+        </span>
+      </div>
+      <div className="h-2 bg-white/5 rounded-full overflow-hidden relative">
+        <div className="absolute top-0 bottom-0 w-px bg-red-500/60" style={{ left: "14.3%" }}/>
+        <div className="absolute top-0 bottom-0 w-px bg-amber-500/60" style={{ left: "42.9%" }}/>
+        <div
+          className={`h-full transition-all duration-500 ${machine.rulHours < 24 ? "bg-red-500" : machine.rulHours < 72 ? "bg-red-400" : machine.rulHours < 168 ? "bg-amber-400" : "bg-green-500"}`}
+          style={{ width: `${Math.min((machine.rulHours / 168) * 100, 100)}%` }}
+        />
+      </div>
+      <div className="flex justify-between text-[9px] text-zinc-600 mt-1">
+        <span>0h</span><span>24h (critical)</span><span>72h (warning)</span><span>168h (max)</span>
+      </div>
+    </div>
+
+    {/* Anomaly */}
+    <div>
+      <div className="flex justify-between items-center mb-1.5">
+        <span className="text-[11px] text-zinc-400">Anomaly Detection (IsolationForest)</span>
+        <span className={`text-[11px] font-semibold ${machine.isAnomaly ? "text-purple-400" : "text-green-400"}`}>
+          Score {machine.anomalyScore.toFixed(3)} · {machine.isAnomaly ? "DETECTED" : "Normal"}
+        </span>
+      </div>
+      <div className="h-2 bg-white/5 rounded-full overflow-hidden relative">
+        <div className="absolute top-0 bottom-0 w-0.5 bg-purple-400" style={{left: "62%"}} title="Threshold 0.62"/>
+        <div
+          className={`h-full transition-all duration-500 ${machine.isAnomaly ? "bg-purple-500" : "bg-zinc-500"}`}
+          style={{ width: `${Math.min(machine.anomalyScore * 100, 100)}%` }}
+        />
+      </div>
+      <div className="flex justify-between text-[9px] text-zinc-600 mt-1">
+        <span>0</span><span className="text-purple-400">↑ threshold 0.62</span><span>1.0</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+{/* NLP Summary — full width, bullet list */}
+<div className="bg-[#18191c] border border-white/5 rounded-xl p-5 mb-4">
+  <div className="flex items-center justify-between mb-4">
+    <p className="text-[13px] font-medium text-zinc-300">NLP Summary · Analisis Maintenance Logs</p>
+    <div className="flex items-center gap-2">
+      {machine.nlp.hasUrgentRecent && (
+        <span className="text-[9px] bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded font-medium">
+          URGENT 30D
+        </span>
+      )}
+      <span className="text-[10px] text-zinc-500">{machine.nlp.totalLogs} catatan</span>
+    </div>
+  </div>
+
+  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    {/* Kolom Kiri: Distribusi */}
+    <div className="space-y-3">
+      <div>
+        <div className="flex justify-between items-center mb-1">
+          <span className="text-[11px] text-zinc-500">Severity rata-rata (NLP)</span>
+          <span className="text-[11px] text-zinc-400">
+            {machine.nlp.avgSeverity.toFixed(2)}/5 · max {machine.nlp.maxSeverity}
+          </span>
         </div>
-
-        {/* Failure Prediction + AI Recommendation */}
-        <div className="flex flex-col gap-4">
-          <div className="bg-[#18191c] border border-white/5 rounded-xl p-4 flex-1">
-            <p className="text-[13px] font-medium text-zinc-300 mb-3">Failure Prediction</p>
-            <div className="flex items-center gap-4">
-              <Gauge score={machine.healthScore}/>
-              <div>
-                <p className={`text-[13px] font-semibold mb-1 ${scoreColor(machine.healthScore)}`}>{machine.healthLabel}</p>
-                <p className="text-[11px] text-zinc-500">Prob gagal: <span className="text-red-400">{(machine.failureProb * 100).toFixed(1)}%</span></p>
-                <p className="text-[11px] text-zinc-500 mt-1">Risk: <span className={machine.riskLevel === "HIGH" ? "text-red-400" : machine.riskLevel === "MEDIUM" ? "text-amber-400" : "text-green-400"}>{machine.riskLevel}</span></p>
-                {machine.willFail && <p className="text-[11px] text-red-400 font-semibold mt-1">⚠️ Akan gagal 7 hari!</p>}
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-[#18191c] border border-l-2 border-l-green-500 border-white/5 rounded-xl p-4">
-            <p className="text-[13px] font-medium text-zinc-300 mb-2">AI Recommendation</p>
-            <p className="text-[12px] text-zinc-400 leading-5 mb-3">{machine.recommendation}</p>
-            <button className="w-full bg-green-500 hover:bg-green-400 text-white text-[12px] font-semibold py-2.5 rounded-lg transition-colors">
-              Schedule Maintenance
-            </button>
-          </div>
+        <div className="h-1.5 bg-white/5 rounded-full overflow-hidden relative">
+          {/* Threshold markers */}
+          <div className="absolute top-0 bottom-0 w-px bg-amber-500/40" style={{left: "40%"}} title="Medium 2/5"/>
+          <div className="absolute top-0 bottom-0 w-px bg-red-500/40" style={{left: "80%"}} title="High 4/5"/>
+          <div
+            className={`h-full rounded-full transition-all duration-500 ${
+              machine.nlp.riskLevel === "High" ? "bg-red-500" :
+              machine.nlp.riskLevel === "Medium" ? "bg-amber-400" :
+              "bg-green-500"
+            }`}
+            style={{ width: `${(machine.nlp.avgSeverity / 5) * 100}%` }}
+          />
+        </div>
+        <div className="flex justify-between items-center mt-1 text-[9px]">
+          <span className="text-zinc-600">0</span>
+          <span className={`font-semibold ${
+            machine.nlp.riskLevel === "High" ? "text-red-400" :
+            machine.nlp.riskLevel === "Medium" ? "text-amber-400" :
+            "text-green-400"
+          }`}>
+            {machine.nlp.riskLevel} Risk
+          </span>
+          <span className="text-zinc-600">5</span>
         </div>
       </div>
 
-      {/* Maintenance History */}
+      <div className="space-y-1.5">
+        <p className="text-[10px] text-zinc-600 uppercase tracking-wide">Distribusi Tipe</p>
+        {[
+          { label: "Emergency", count: machine.nlp.emergencyCount, color: "bg-red-500", textColor: "text-red-400" },
+          { label: "Corrective", count: machine.nlp.correctiveCount, color: "bg-amber-400", textColor: "text-amber-400" },
+          { label: "Preventive", count: machine.nlp.preventiveCount, color: "bg-green-500", textColor: "text-green-400" },
+        ].map(t => (
+          <div key={t.label} className="flex items-center gap-2">
+            <span className={`text-[10px] w-16 ${t.textColor}`}>{t.label}</span>
+            <div className="flex-1 h-1 bg-white/5 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full ${t.color}`}
+                style={{ width: machine.nlp.totalLogs > 0 ? `${(t.count / machine.nlp.totalLogs) * 100}%` : "0%" }}
+              />
+            </div>
+            <span className="text-[10px] text-zinc-500 w-4 text-right">{t.count}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    {/* Kolom Kanan: Bullet Insights — pakai data real NLP */}
+<div className="space-y-2">
+  <p className="text-[10px] text-zinc-600 uppercase tracking-wide">Insight (NLP Analysis)</p>
+  <div className="space-y-1.5">
+
+    {/* ⭐ Risk level dari notebook */}
+    <div className="flex items-start gap-2">
+      <span className={`text-[10px] mt-0.5 ${
+        machine.nlp.riskLevel === "High" ? "text-red-400" :
+        machine.nlp.riskLevel === "Medium" ? "text-amber-400" :
+        "text-green-400"
+      }`}>•</span>
+      <p className="text-[11px] text-zinc-400">
+        Risk level:{" "}
+        <span className={`font-semibold ${
+          machine.nlp.riskLevel === "High" ? "text-red-400" :
+          machine.nlp.riskLevel === "Medium" ? "text-amber-400" :
+          "text-green-400"
+        }`}>
+          {machine.nlp.riskLevel}
+        </span>{" "}
+        (avg severity {machine.nlp.avgSeverity.toFixed(2)}/5)
+      </p>
+    </div>
+
+    {/* ⭐ Urgent rate */}
+    <div className="flex items-start gap-2">
+      <span className={`text-[10px] mt-0.5 ${machine.nlp.urgentRate > 0.3 ? "text-red-400" : "text-zinc-600"}`}>•</span>
+      <p className="text-[11px] text-zinc-400">
+        Urgent rate:{" "}
+        <span className={`font-semibold ${machine.nlp.urgentRate > 0.3 ? "text-red-400" : "text-zinc-300"}`}>
+          {(machine.nlp.urgentRate * 100).toFixed(1)}%
+        </span>{" "}
+        dari semua maintenance logs
+      </p>
+    </div>
+
+    {/* ⭐ Dominant topic + tech terms */}
+    <div className="flex items-start gap-2">
+      <span className="text-zinc-600 text-[10px] mt-0.5">•</span>
+      <p className="text-[11px] text-zinc-400">
+        Topic dominan: <span className="font-medium text-zinc-300">Topic #{machine.nlp.dominantTopic}</span>
+        {" · "}
+        Avg <span className="text-white">{machine.nlp.avgTechTerms.toFixed(1)}</span> tech terms,
+        {" "}
+        <span className="text-white">{machine.nlp.avgProblemKw.toFixed(1)}</span> problem keywords
+      </p>
+    </div>
+
+    {/* Total logs */}
+    <div className="flex items-start gap-2">
+      <span className="text-zinc-600 text-[10px] mt-0.5">•</span>
+      <p className="text-[11px] text-zinc-400">
+        Total <span className="text-white font-medium">{machine.nlp.totalLogs}</span> catatan maintenance tercatat
+      </p>
+    </div>
+
+    {/* Emergency count */}
+    <div className="flex items-start gap-2">
+      <span className={`text-[10px] mt-0.5 ${machine.nlp.emergencyCount > 0 ? "text-red-400" : "text-zinc-600"}`}>•</span>
+      <p className="text-[11px] text-zinc-400">
+        {machine.nlp.emergencyCount > 0
+          ? <><span className="text-red-400 font-medium">{machine.nlp.emergencyCount}x emergency</span> tercatat dalam riwayat</>
+          : "Tidak ada emergency dalam riwayat"
+        }
+      </p>
+    </div>
+
+    {/* Urgent recent */}
+    <div className="flex items-start gap-2">
+      <span className={`text-[10px] mt-0.5 ${machine.nlp.hasUrgentRecent ? "text-red-400" : "text-zinc-600"}`}>•</span>
+      <p className="text-[11px] text-zinc-400">
+        {machine.nlp.hasUrgentRecent
+          ? <><span className="text-red-400 font-medium">Ada emergency dalam 30 hari terakhir</span></>
+          : "Tidak ada emergency dalam 30 hari terakhir"
+        }
+      </p>
+    </div>
+
+    {/* Avg downtime */}
+    <div className="flex items-start gap-2">
+      <span className={`text-[10px] mt-0.5 ${machine.nlp.avgDowntime > 5 ? "text-amber-400" : "text-zinc-600"}`}>•</span>
+      <p className="text-[11px] text-zinc-400">
+        Rata-rata downtime{" "}
+        <span className={`font-medium ${machine.nlp.avgDowntime > 5 ? "text-amber-400" : "text-white"}`}>
+          {machine.nlp.avgDowntime.toFixed(1)} jam
+        </span>{" "}
+        per maintenance
+      </p>
+    </div>
+
+    {/* Days since last */}
+    <div className="flex items-start gap-2">
+      <span className={`text-[10px] mt-0.5 ${machine.nlp.daysSinceLastMaint > 60 ? "text-red-400" : machine.nlp.daysSinceLastMaint > 30 ? "text-amber-400" : "text-zinc-600"}`}>•</span>
+      <p className="text-[11px] text-zinc-400">
+        Maintenance terakhir{" "}
+        {machine.nlp.daysSinceLastMaint < 0 ? "tidak diketahui" : (
+          <>
+            <span className={`font-medium ${machine.nlp.daysSinceLastMaint > 60 ? "text-red-400" : machine.nlp.daysSinceLastMaint > 30 ? "text-amber-400" : "text-white"}`}>
+              {machine.nlp.daysSinceLastMaint} hari
+            </span>{" "}yang lalu
+          </>
+        )}
+      </p>
+    </div>
+
+  </div>
+  <div className="mt-3 pt-2 border-t border-white/5">
+    <div className="flex justify-between text-[11px]">
+      <span className="text-zinc-500">Total biaya historis:</span>
+      <span className="text-zinc-300 font-medium">Rp {machine.nlp.totalCost.toLocaleString("id-ID")}</span>
+    </div>
+  </div>
+</div>
+</div>
+</div>
+
+{/* ⭐ NEW: Top Keywords NLP (dari TF-IDF analysis di Tahap 3) */}
+  {machine.nlp.topKeywords.length > 0 && (
+    <div className="mt-4 pt-4 border-t border-white/5">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-[12px] font-medium text-zinc-300">Top Keywords dari Maintenance Notes</p>
+        <span className="text-[9px] text-zinc-500">TF-IDF · Tahap 3 NLP</span>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {machine.nlp.topKeywords.map((kw, i) => {
+          const intensity = kw.score / (machine.nlp.topKeywords[0]?.score || 1);
+          return (
+            <div
+              key={i}
+              className="px-2.5 py-1.5 rounded-lg border flex items-center gap-2"
+              style={{
+                borderColor: `rgba(168, 85, 247, ${0.2 + intensity * 0.4})`,
+                backgroundColor: `rgba(168, 85, 247, ${0.05 + intensity * 0.1})`,
+              }}
+            >
+              <span className="text-[9px] text-zinc-500 font-mono">#{i + 1}</span>
+              <span className="text-[11px] text-zinc-200 font-medium">{kw.keyword}</span>
+              <span className="text-[9px] text-zinc-500">{kw.score.toFixed(3)}</span>
+            </div>
+          );
+        })}
+      </div>
+      <p className="text-[10px] text-zinc-600 mt-2">
+        Keywords paling sering muncul di catatan teknisi mesin ini, ranked by TF-IDF importance.
+      </p>
+    </div>
+  )}
+<div className="mt-4 pt-4 border-t border-white/5">
+    <p className="text-[12px] font-medium text-zinc-300 mb-3">Catatan Teknisi per Tipe Maintenance</p>
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+
+      {/* Emergency Column */}
+      <div className="bg-red-500/5 border border-red-500/20 rounded-lg p-3">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[10px] font-semibold bg-red-500 text-white px-1.5 py-0.5 rounded">
+            EMERGENCY
+          </span>
+          <span className="text-[10px] text-zinc-500">{machine.nlp.emergencyCount} catatan</span>
+        </div>
+        {machine.history.filter(h => h.type === "Emergency").length > 0 ? (
+          <div className="space-y-2">
+            {machine.history.filter(h => h.type === "Emergency").map((rec, i) => (
+              <div key={i} className="border-l-2 border-red-500 pl-2">
+                <p className="text-[11px] text-zinc-300 leading-4">&ldquo;{rec.note}&rdquo;</p>
+                <p className="text-[9px] text-zinc-500 mt-1">
+                  {rec.date} · {rec.downtime} · {rec.cost}
+                </p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-[11px] text-zinc-600 italic">Tidak ada catatan emergency</p>
+        )}
+      </div>
+
+      {/* Corrective Column */}
+      <div className="bg-amber-400/5 border border-amber-400/20 rounded-lg p-3">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[10px] font-semibold bg-amber-400 text-amber-900 px-1.5 py-0.5 rounded">
+            CORRECTIVE
+          </span>
+          <span className="text-[10px] text-zinc-500">{machine.nlp.correctiveCount} catatan</span>
+        </div>
+        {machine.history.filter(h => h.type === "Corrective").length > 0 ? (
+          <div className="space-y-2">
+            {machine.history.filter(h => h.type === "Corrective").map((rec, i) => (
+              <div key={i} className="border-l-2 border-amber-400 pl-2">
+                <p className="text-[11px] text-zinc-300 leading-4">&ldquo;{rec.note}&rdquo;</p>
+                <p className="text-[9px] text-zinc-500 mt-1">
+                  {rec.date} · {rec.downtime} · {rec.cost}
+                </p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-[11px] text-zinc-600 italic">Tidak ada catatan corrective</p>
+        )}
+      </div>
+
+      {/* Preventive Column */}
+      <div className="bg-green-500/5 border border-green-500/20 rounded-lg p-3">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[10px] font-semibold bg-green-500/80 text-white px-1.5 py-0.5 rounded">
+            PREVENTIVE
+          </span>
+          <span className="text-[10px] text-zinc-500">{machine.nlp.preventiveCount} catatan</span>
+        </div>
+        {machine.history.filter(h => h.type === "Preventive").length > 0 ? (
+          <div className="space-y-2">
+            {machine.history.filter(h => h.type === "Preventive").map((rec, i) => (
+              <div key={i} className="border-l-2 border-green-500 pl-2">
+                <p className="text-[11px] text-zinc-300 leading-4">&ldquo;{rec.note}&rdquo;</p>
+                <p className="text-[9px] text-zinc-500 mt-1">
+                  {rec.date} · {rec.downtime} · {rec.cost}
+                </p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-[11px] text-zinc-600 italic">Tidak ada catatan preventive</p>
+        )}
+      </div>
+
+    </div>
+  </div>
+
+
+{/* AI Recommendation */}
+{machine.recommendation && (
+  <div className={`border rounded-xl p-4 mb-4 ${
+    machine.status === "critical" ? "bg-red-500/5 border-red-500/20" :
+    machine.status === "warning"  ? "bg-amber-400/5 border-amber-400/20" :
+    "bg-green-500/5 border-green-500/20"
+  }`}>
+    <p className="text-[11px] text-zinc-500 mb-1.5">Rekomendasi Model AI</p>
+    <p className="text-[13px] text-zinc-300 leading-relaxed">{machine.recommendation}</p>
+    <button className="mt-3 w-full bg-green-500 hover:bg-green-400 text-white text-[12px] font-semibold py-2.5 rounded-lg transition-colors">
+      Schedule Maintenance
+    </button>
+  </div>
+)}
+
+      {/* Maintenance History — dengan Pagination */}
       <div className="bg-[#18191c] border border-white/5 rounded-xl overflow-hidden">
         <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
           <p className="text-[13px] font-medium text-zinc-300">Maintenance History</p>
-          <span className="text-[11px] text-zinc-500">Dari Supabase</span>
+          <span className="text-[11px] text-zinc-500">
+            {machine.history.length > 0 ? (
+              <>
+                Showing {historyStart + 1}–{Math.min(historyEnd, machine.history.length)} of {machine.history.length}
+              </>
+            ) : "Dari Supabase"}
+          </span>
         </div>
+
         {machine.history.length === 0 ? (
           <div className="py-8 text-center text-[12px] text-zinc-500">Belum ada riwayat maintenance</div>
         ) : (
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-white/5">
-                {["Tanggal","Tipe","Downtime","Biaya","Catatan"].map(h => (
-                  <th key={h} className="text-left text-[11px] font-medium text-zinc-500 px-4 py-3">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {machine.history.map((r, i) => (
-                <tr key={i} className="border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors">
-                  <td className="px-4 py-3 text-[12px] text-zinc-400">{r.date}</td>
-                  <td className="px-4 py-3"><TypeBadge type={r.type}/></td>
-                  <td className="px-4 py-3 text-[12px] text-zinc-400">{r.downtime}</td>
-                  <td className="px-4 py-3 text-[12px] text-zinc-400">{r.cost}</td>
-                  <td className="px-4 py-3 text-[12px] text-zinc-500">{r.note}</td>
+          <>
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-white/5">
+                  {["Tanggal","Tipe","Downtime","Biaya","Catatan"].map(h => (
+                    <th key={h} className="text-left text-[11px] font-medium text-zinc-500 px-4 py-3">{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {paginatedHistory.map((r, i) => (
+                  <tr key={`${currentHistoryPage}-${i}`} className="border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors">
+                    <td className="px-4 py-3 text-[12px] text-zinc-400">{r.date}</td>
+                    <td className="px-4 py-3"><TypeBadge type={r.type}/></td>
+                    <td className="px-4 py-3 text-[12px] text-zinc-400">{r.downtime}</td>
+                    <td className="px-4 py-3 text-[12px] text-zinc-400">{r.cost}</td>
+                    <td className="px-4 py-3 text-[12px] text-zinc-500">{r.note}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {/* ⭐ NEW: Pagination Controls (hanya tampil jika > 1 page) */}
+            {totalHistoryPages > 1 && (
+              <div className="px-4 py-3 border-t border-white/5 flex items-center justify-between">
+                <span className="text-[11px] text-zinc-500">
+                  Page {currentHistoryPage} of {totalHistoryPages}
+                </span>
+                <div className="flex items-center gap-1">
+                  {/* Previous button */}
+                  <button
+                    onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
+                    disabled={currentHistoryPage === 1}
+                    className={`text-[11px] px-3 py-1 rounded-lg border transition-colors ${
+                      currentHistoryPage === 1
+                        ? "border-white/5 text-zinc-700 cursor-not-allowed"
+                        : "border-white/10 text-zinc-400 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    ← Prev
+                  </button>
+
+                  {/* Page numbers */}
+                  <div className="flex items-center gap-1 mx-1">
+                    {Array.from({ length: totalHistoryPages }, (_, i) => i + 1).map(pageNum => (
+                      <button
+                        key={pageNum}
+                        onClick={() => setHistoryPage(pageNum)}
+                        className={`text-[11px] w-7 h-7 rounded-lg transition-colors ${
+                          pageNum === currentHistoryPage
+                            ? "bg-white/10 text-white font-medium"
+                            : "text-zinc-500 hover:text-white hover:bg-white/5"
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Next button */}
+                  <button
+                    onClick={() => setHistoryPage(p => Math.min(totalHistoryPages, p + 1))}
+                    disabled={currentHistoryPage === totalHistoryPages}
+                    className={`text-[11px] px-3 py-1 rounded-lg border transition-colors ${
+                      currentHistoryPage === totalHistoryPages
+                        ? "border-white/5 text-zinc-700 cursor-not-allowed"
+                        : "border-white/10 text-zinc-400 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    Next →
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

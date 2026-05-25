@@ -29,6 +29,10 @@ interface MachineRow {
   failureProb: number;
   willFail: boolean;
   riskLevel: RiskLevel;
+  rulHours: number;
+  rulCapped: boolean;
+  isAnomaly: boolean;
+  anomalyScore: number;
   recommendation: string;
   status: "critical" | "warning" | "good";
   latestSensor: SensorRow | null;
@@ -121,6 +125,7 @@ export default function DashboardPage() {
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState<string | null>(null);
   const [lastUpdate, setLastUpdate]   = useState<string>("");
+  const [selectedMachine, setSelectedMachine] = useState<string>("M-01");
 
   const fetchAll = useCallback(async () => {
     try {
@@ -149,7 +154,7 @@ export default function DashboardPage() {
       const predictions = await Promise.all(
         machineIds.map((id) => {
           const s = latestPerMachine[id];
-          return fetch(`${API_URL}/predict`, {
+          return fetch(`${API_URL}/predict/full`, {
             method : "POST",
             headers: { "Content-Type": "application/json" },
             body   : JSON.stringify({
@@ -170,27 +175,31 @@ export default function DashboardPage() {
         })
       );
 
-      // 3. Simpan prediksi ke Supabase
-      await supabase.from("predictions").insert(
-        predictions.map(p => ({
-          machine_id: p.machine_id,
-          health_label: p.task_B.health_label,
-          health_score: healthScoreFromProb(p.task_B.probabilities),
-          failure_probability: p.task_A.failure_probability,
-          will_fail: p.task_A.will_fail_within_7days,
-          risk_level: p.task_A.risk_level,
-          recommendation: p.recommendation,
-        }))
-      );
+      // 3. Simpan prediksi ke Supabase (nonaktif dulu)
+      // await supabase.from("predictions").insert(
+      //   predictions.map(p => ({
+      //     machine_id: p.machine_id,
+      //     health_label: p.task_B.health_label,
+      //     health_score: healthScoreFromProb(p.task_B.probabilities),
+      //     failure_probability: p.task_A.failure_probability,
+      //     will_fail: p.task_A.will_fail_within_7days,
+      //     risk_level: p.task_A.risk_level,
+      //     recommendation: p.recommendation,
+      //   }))
+      // );
 
       // 4. Build rows
       const rows: MachineRow[] = predictions.map((p, i) => ({
         id: p.machine_id,
-        healthScore: healthScoreFromProb(p.task_B.probabilities),
+        healthScore: p.overall_health_score ?? healthScoreFromProb(p.task_B.probabilities),
         healthLabel: p.task_B.health_label,
         failureProb: p.task_A.failure_probability,
         willFail: p.task_A.will_fail_within_7days,
         riskLevel: p.task_A.risk_level,
+        rulHours: p.task_C?.rul_hours ?? 168,
+        rulCapped: p.task_C?.rul_capped ?? false,
+        isAnomaly: p.anomaly?.is_anomaly ?? false,
+        anomalyScore: p.anomaly?.score ?? 0,
         recommendation: p.recommendation,
         status: labelToStatus(p.task_B.health_label),
         latestSensor: latestPerMachine[machineIds[i]] ?? null,
@@ -198,13 +207,13 @@ export default function DashboardPage() {
 
       setMachines(rows.sort((a, b) => a.healthScore - b.healthScore));
 
-      // 5. Sensor trend M-01
-      const m01 = (sensorData ?? [])
-        .filter(r => r.machine_id === "M-01")
+      // 5. Sensor trend untuk mesin yang dipilih
+      const machineData = (sensorData ?? [])
+        .filter(r => r.machine_id === selectedMachine)
         .slice(0, 24)
         .reverse();
 
-      setSensorTrend(m01.map(r => ({
+      setSensorTrend(machineData.map(r => ({
         label: new Date(r.timestamp).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
         temperature: r.temperature,
         vibration: r.vibration,
@@ -217,13 +226,14 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedMachine]);
 
-  useEffect(() => {
-    fetchAll();
-    const interval = setInterval(fetchAll, 60_000);
-    return () => clearInterval(interval);
-  }, [fetchAll]);
+useEffect(() => {
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  fetchAll();
+  const interval = setInterval(fetchAll, 60_000);
+  return () => clearInterval(interval);
+}, [fetchAll]);
 
   const criticalCount = machines.filter(m => m.status === "critical").length;
   const willFailCount = machines.filter(m => m.willFail).length;
@@ -274,7 +284,7 @@ export default function DashboardPage() {
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
         {loading ? Array.from({length:4}).map((_,i) => <Skeleton key={i} className="h-24 rounded-xl"/>) : (
           <>
             <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
@@ -297,47 +307,108 @@ export default function DashboardPage() {
               <p className={`text-2xl font-medium leading-none mb-1 ${willFailCount > 0 ? "text-red-400" : "text-green-400"}`}>{willFailCount}</p>
               <p className="text-[11px] text-zinc-500">{mostCritical ? `${mostCritical.id} paling kritis` : "-"}</p>
             </div>
+            <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
+            <p className="text-[11px] text-zinc-500 mb-1.5">Anomali Terdeteksi</p>
+            <p className={`text-2xl font-medium leading-none mb-1 ${machines.filter(m => m.isAnomaly).length > 0 ? "text-purple-400" : "text-white"}`}>
+              {machines.filter(m => m.isAnomaly).length}
+            </p>
+            <p className="text-[11px] text-zinc-500">IsolationForest</p>
+          </div>
           </>
         )}
       </div>
 
-      {/* Charts Row */}
+        {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+        {/* Card kiri: Health Score per Mesin */}
         <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
           <p className="text-[13px] font-medium text-zinc-300 mb-4">Health Score per Mesin</p>
           {loading ? (
-            <div className="flex flex-col gap-3">{Array.from({length:5}).map((_,i) => <Skeleton key={i} className="h-8"/>)}</div>
+            <div className="flex flex-col gap-3">
+              {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-8"/>)}
+            </div>
           ) : (
             machines.map((m) => (
               <Link key={m.id} href={`/machines/${m.id}`} className="block mb-3 group">
+                {/* Header row: ID + badges + score */}
                 <div className="flex justify-between items-center mb-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-[12px] text-zinc-400 group-hover:text-white transition-colors">{m.id}</span>
+                    <span className="text-[12px] text-zinc-400 group-hover:text-white transition-colors">
+                      {m.id}
+                    </span>
                     {m.willFail && (
-                      <span className="text-[9px] bg-red-500/20 text-red-400 border border-red-500/30 px-1.5 py-0.5 rounded font-medium">GAGAL 7D</span>
+                      <span className="text-[9px] bg-red-500/20 text-red-400 border border-red-500/30 px-1.5 py-0.5 rounded font-medium">
+                        GAGAL 7D
+                      </span>
+                    )}
+                    {m.isAnomaly && (
+                      <span className="text-[9px] bg-purple-500/20 text-purple-400 border border-purple-500/30 px-1.5 py-0.5 rounded font-medium">
+                        ANOMALI
+                      </span>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${riskBadge(m.riskLevel)}`}>{m.riskLevel}</span>
-                    <span className={`text-[11px] font-medium ${scoreColor(m.healthScore)}`}>{m.healthScore}%</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${riskBadge(m.riskLevel)}`}>
+                      {m.riskLevel}
+                    </span>
+                    <span className={`text-[11px] font-medium ${scoreColor(m.healthScore)}`}>
+                      {m.healthScore}%
+                    </span>
                   </div>
                 </div>
+
+                {/* Progress bar */}
                 <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-                  <div className={`h-full rounded-full transition-all duration-700 ${barColor(m.healthScore)}`} style={{width:`${m.healthScore}%`}}/>
+                  <div
+                    className={`h-full rounded-full transition-all duration-700 ${barColor(m.healthScore)}`}
+                    style={{ width: `${m.healthScore}%` }}
+                  />
                 </div>
+
+                {/* Info rows: sensor + prediction outputs */}
                 {m.latestSensor && (
-                  <p className="text-[10px] text-zinc-600 mt-1">
-                    Temp: {m.latestSensor.temperature}°C · Vib: {m.latestSensor.vibration} · RPM: {m.latestSensor.rpm}
-                  </p>
+                  <div className="mt-1 space-y-0.5">
+                    <p className="text-[10px] text-zinc-600">
+                      Temp: {m.latestSensor.temperature}°C · Vib: {m.latestSensor.vibration} · RPM: {m.latestSensor.rpm}
+                      {" · "}
+                      <span className={m.rulHours < 48 ? "text-red-400" : "text-zinc-600"}>
+                        RUL: {m.rulHours}j{m.rulCapped ? " (max)" : ""}
+                      </span>
+                    </p>
+                    <p className="text-[10px] text-zinc-600">
+                      <span className={m.failureProb >= 0.5 ? "text-red-400" : m.failureProb >= 0.2 ? "text-amber-400" : "text-zinc-600"}>
+                        Fail: {(m.failureProb * 100).toFixed(1)}%
+                      </span>
+                      {" · "}
+                      <span className={m.isAnomaly ? "text-purple-400" : "text-zinc-600"}>
+                        Anom: {m.anomalyScore.toFixed(2)}
+                      </span>
+                    </p>
+                  </div>
                 )}
               </Link>
             ))
           )}
         </div>
 
+        {/* Card kanan: Sensor Trends */}
         <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
           <div className="flex items-center justify-between mb-4">
-            <p className="text-[13px] font-medium text-zinc-300">Sensor Trends M-01</p>
+            <div className="flex items-center gap-2">
+              <p className="text-[13px] font-medium text-zinc-300">Sensor Trends</p>
+              <select
+                value={selectedMachine}
+                onChange={(e) => setSelectedMachine(e.target.value)}
+                  aria-label="Pilih mesin untuk melihat sensor trends"
+                className="bg-white/5 border border-white/10 rounded-md px-2 py-0.5 text-[11px] text-zinc-300 focus:outline-none focus:border-white/20 cursor-pointer hover:bg-white/10 transition-colors"
+              >
+                {machines.map(m => (
+                  <option key={m.id} value={m.id} className="bg-[#18191c]">
+                    {m.id}
+                  </option>
+                ))}
+              </select>
+            </div>
             <span className="text-[10px] text-zinc-500">Data real Supabase</span>
           </div>
           {loading ? <Skeleton className="h-40"/> : <SensorChart data={sensorTrend}/>}

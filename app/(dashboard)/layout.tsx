@@ -117,6 +117,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             ))
           )}
         </div>
+
+                <div className="px-2 py-3 border-t border-white/5 mt-2 shrink-0">
+          <button
+            onClick={async () => {
+              await supabase.auth.signOut()
+              window.location.href = '/login'
+            }}
+            className="flex items-center gap-2.5 px-3 py-2 rounded-md text-[13px] text-zinc-400 hover:text-red-400 hover:bg-red-500/10 transition-colors w-full"
+          >
+            <span className="text-base leading-none">↩</span>
+            Logout
+          </button>
+        </div>
+        
       </aside>
       {/* Main content */}
       <main className="flex-1 overflow-y-auto">

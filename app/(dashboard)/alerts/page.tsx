@@ -21,15 +21,53 @@ interface Alert {
   healthScore: number;
 }
 
+// ── Nilai normal per mesin (dari dataset nyata, failure=0) ──────────────────
+const NORMAL_SENSOR_VALUES: Record<string, {
+  temperature: number;
+  vibration: number;
+  pressure: number;
+  rpm: number;
+  power_consumption: number;
+  noise_level: number;
+  humidity: number;
+}> = {
+  "M-01": { temperature: 73.08, vibration: 0.49, pressure: 101.66, rpm: 2429, power_consumption: 76.49, noise_level: 71.12, humidity: 54.73 },
+  "M-02": { temperature: 72.75, vibration: 0.48, pressure: 101.52, rpm: 2420, power_consumption: 76.10, noise_level: 70.88, humidity: 55.04 },
+  "M-03": { temperature: 72.91, vibration: 0.49, pressure: 101.70, rpm: 2429, power_consumption: 76.55, noise_level: 71.14, humidity: 54.94 },
+  "M-04": { temperature: 72.51, vibration: 0.47, pressure: 101.32, rpm: 2415, power_consumption: 75.82, noise_level: 70.62, humidity: 55.03 },
+  "M-05": { temperature: 72.28, vibration: 0.46, pressure: 101.16, rpm: 2406, power_consumption: 75.28, noise_level: 70.22, humidity: 55.11 },
+  "M-06": { temperature: 73.02, vibration: 0.49, pressure: 101.64, rpm: 2430, power_consumption: 76.69, noise_level: 71.14, humidity: 54.97 },
+  "M-07": { temperature: 72.51, vibration: 0.47, pressure: 101.33, rpm: 2416, power_consumption: 75.79, noise_level: 70.61, humidity: 54.98 },
+  "M-08": { temperature: 73.05, vibration: 0.49, pressure: 101.65, rpm: 2429, power_consumption: 76.46, noise_level: 71.11, humidity: 54.98 },
+  "M-09": { temperature: 72.57, vibration: 0.47, pressure: 101.35, rpm: 2412, power_consumption: 75.61, noise_level: 70.59, humidity: 55.12 },
+  "M-10": { temperature: 72.78, vibration: 0.48, pressure: 101.56, rpm: 2422, power_consumption: 76.15, noise_level: 70.91, humidity: 55.06 },
+  "M-11": { temperature: 72.97, vibration: 0.49, pressure: 101.69, rpm: 2429, power_consumption: 76.56, noise_level: 71.15, humidity: 54.97 },
+  "M-12": { temperature: 72.52, vibration: 0.47, pressure: 101.30, rpm: 2416, power_consumption: 75.77, noise_level: 70.63, humidity: 55.08 },
+  "M-13": { temperature: 72.13, vibration: 0.46, pressure: 101.17, rpm: 2405, power_consumption: 75.40, noise_level: 70.37, humidity: 54.88 },
+  "M-14": { temperature: 72.71, vibration: 0.48, pressure: 101.49, rpm: 2422, power_consumption: 76.09, noise_level: 70.87, humidity: 55.06 },
+  "M-15": { temperature: 72.49, vibration: 0.47, pressure: 101.35, rpm: 2412, power_consumption: 75.75, noise_level: 70.54, humidity: 54.92 },
+  "M-16": { temperature: 72.32, vibration: 0.46, pressure: 101.15, rpm: 2408, power_consumption: 75.45, noise_level: 70.29, humidity: 55.19 },
+  "M-17": { temperature: 72.73, vibration: 0.48, pressure: 101.49, rpm: 2420, power_consumption: 76.13, noise_level: 70.96, humidity: 55.15 },
+  "M-18": { temperature: 72.71, vibration: 0.48, pressure: 101.52, rpm: 2423, power_consumption: 76.17, noise_level: 70.82, humidity: 55.08 },
+  "M-19": { temperature: 72.93, vibration: 0.49, pressure: 101.68, rpm: 2427, power_consumption: 76.44, noise_level: 71.11, humidity: 54.97 },
+  "M-20": { temperature: 72.54, vibration: 0.47, pressure: 101.36, rpm: 2417, power_consumption: 75.74, noise_level: 70.52, humidity: 54.79 },
+};
+
+const DEFAULT_NORMAL = {
+  temperature: 72.68, vibration: 0.48, pressure: 101.45,
+  rpm: 2420, power_consumption: 76.10, noise_level: 70.78, humidity: 55.00,
+};
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
 function healthScoreFromProb(probs: { Healthy: number; Warning: number; Critical: number }) {
   return Math.round(probs.Healthy * 100 + probs.Warning * 50);
 }
 
 function getCategory(sensor: Record<string, number>): string {
-  if (sensor.temperature >= 85) return "Temperature";
-  if (sensor.vibration >= 1.0)  return "Mechanical";
-  if (sensor.pressure >= 110)   return "Pressure";
-  if (sensor.noise_level >= 80) return "Noise";
+  if (sensor.temperature >= 85)       return "Temperature";
+  if (sensor.vibration >= 1.0)        return "Mechanical";
+  if (sensor.pressure >= 110)         return "Pressure";
+  if (sensor.noise_level >= 80)       return "Noise";
   if (sensor.power_consumption >= 90) return "Electrical";
   return "General";
 }
@@ -39,39 +77,40 @@ function getMessage(severity: Severity, sensor: Record<string, number>, healthSc
     if (sensor.temperature >= 85) return `Suhu operasional melebihi threshold ${sensor.temperature.toFixed(0)}°C.`;
     if (sensor.vibration >= 1.0)  return `Health score turun drastis (${healthScore}%). Bearing aus, perlu penggantian segera.`;
     if (sensor.pressure >= 110)   return `Pressure melebihi batas aman ${sensor.pressure.toFixed(0)} bar.`;
-    return `Risiko kegagalan tinggi. Failure probability ${(prob*100).toFixed(1)}%.`;
+    return `Risiko kegagalan tinggi. Failure probability ${(prob * 100).toFixed(1)}%.`;
   }
-  if (sensor.vibration >= 0.7)  return `Vibrasi melebihi batas normal. Monitor terus untuk 24 jam ke depan.`;
-  if (sensor.noise_level >= 75) return `Tingkat kebisingan meningkat ${sensor.noise_level.toFixed(0)} dB dari baseline.`;
+  if (sensor.vibration >= 0.7)        return `Vibrasi melebihi batas normal. Monitor terus untuk 24 jam ke depan.`;
+  if (sensor.noise_level >= 75)       return `Tingkat kebisingan meningkat ${sensor.noise_level.toFixed(0)} dB dari baseline.`;
   if (sensor.power_consumption >= 80) return `Konsumsi daya tidak stabil dalam 2 jam terakhir.`;
   return `Health score ${healthScore}% — perlu perhatian dalam 24 jam.`;
 }
 
 function Skeleton({ className }: { className?: string }) {
-  return <div className={`animate-pulse bg-white/5 rounded ${className}`}/>;
+  return <div className={`animate-pulse bg-white/5 rounded ${className}`} />;
 }
 
 function exportAlerts(alerts: Alert[]) {
-  const headers = ["ID","Severity","Machine","Category","Message","Time","Status","Failure Prob","Health Score"];
+  const headers = ["ID", "Severity", "Machine", "Category", "Message", "Time", "Status", "Failure Prob", "Health Score"];
   const rows = alerts.map(a => [
     a.id, a.severity, a.machine, a.category,
     `"${a.message}"`, a.time,
     a.resolved ? "Resolved" : "Active",
-    `${(a.failureProb*100).toFixed(1)}%`,
+    `${(a.failureProb * 100).toFixed(1)}%`,
     `${a.healthScore}%`,
   ]);
   const csv  = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement("a");
-  a.href = url;
-  a.download = `alerts_report_${new Date().toISOString().slice(0,10)}.csv`;
+  a.href     = url;
+  a.download = `alerts_report_${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
 
 const PAGE_SIZE = 5;
 
+// ── Page ─────────────────────────────────────────────────────────────────────
 export default function AlertsPage() {
   const [alerts, setAlerts]           = useState<Alert[]>([]);
   const [loading, setLoading]         = useState(true);
@@ -101,13 +140,22 @@ export default function AlertsPage() {
 
       const machineIds = Object.keys(latest).sort();
 
-      // 2. Ambil machine_id yang sudah resolved dari Supabase
+      // 2. Ambil predictions yang is_resolved=true
+      //    Hanya dianggap resolved jika resolved_at LEBIH BARU dari sensor terbaru
+      //    Ini memastikan jika sensor diubah rusak lagi setelah resolve → alert muncul lagi
       const { data: resolvedData } = await supabase
         .from("predictions")
-        .select("machine_id")
+        .select("machine_id, resolved_at")
         .eq("is_resolved", true);
 
-      const resolvedMachines = new Set((resolvedData ?? []).map(r => r.machine_id));
+      // Map: machine_id → waktu resolved terakhir
+      const resolvedMap: Record<string, string> = {};
+      for (const r of (resolvedData ?? [])) {
+        const existing = resolvedMap[r.machine_id];
+        if (!existing || r.resolved_at > existing) {
+          resolvedMap[r.machine_id] = r.resolved_at;
+        }
+      }
 
       // 3. Prediksi dari FastAPI
       const predictions = await Promise.all(
@@ -117,15 +165,15 @@ export default function AlertsPage() {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              machine_id: s.machine_id,
-              temperature: s.temperature,
-              vibration: s.vibration,
-              pressure: s.pressure,
-              rpm: s.rpm,
+              machine_id:        s.machine_id,
+              temperature:       s.temperature,
+              vibration:         s.vibration,
+              pressure:          s.pressure,
+              rpm:               s.rpm,
               power_consumption: s.power_consumption,
-              noise_level: s.noise_level,
-              humidity: s.humidity,
-              operating_hours: s.operating_hours,
+              noise_level:       s.noise_level,
+              humidity:          s.humidity,
+              operating_hours:   s.operating_hours,
             }),
           }).then(r => r.json());
         })
@@ -134,37 +182,43 @@ export default function AlertsPage() {
       // 4. Build alerts
       const newAlerts: Alert[] = [];
       for (let i = 0; i < predictions.length; i++) {
-        const p      = predictions[i];
-        const mid    = machineIds[i];
-        const sensor = latest[mid];
-        const label  = p.task_B.health_label;
-        const prob   = p.task_A.failure_probability;
-        const score  = healthScoreFromProb(p.task_B.probabilities);
+        const p         = predictions[i];
+        const mid       = machineIds[i];
+        const sensor    = latest[mid];
+        const label     = p.task_B.health_label;
+        const prob      = p.task_A.failure_probability;
+        const score     = healthScoreFromProb(p.task_B.probabilities);
+        const sensorTs  = new Date(sensor.timestamp).toISOString();
+        const resolvedAt = resolvedMap[mid];
+
+        // Cek apakah benar-benar resolved:
+        // resolved hanya berlaku jika waktu resolved LEBIH BARU dari sensor saat ini
+        const isResolved = !!resolvedAt && resolvedAt > sensorTs;
 
         if (label === "Critical" || label === "Warning") {
           const severity: Severity = label === "Critical" ? "CRITICAL" : "WARNING";
           const sensorMap = {
-            temperature: sensor.temperature,
-            vibration: sensor.vibration,
-            pressure: sensor.pressure,
-            noise_level: sensor.noise_level,
+            temperature:       sensor.temperature,
+            vibration:         sensor.vibration,
+            pressure:          sensor.pressure,
+            noise_level:       sensor.noise_level,
             power_consumption: sensor.power_consumption,
           };
 
-          // Simpan prediksi baru ke Supabase (hanya kalau belum resolved)
+          // Hanya insert prediction baru jika belum resolved
           let predId = `${mid}-${Date.now()}`;
-          if (!resolvedMachines.has(mid)) {
+          if (!isResolved) {
             const { data: inserted } = await supabase
               .from("predictions")
               .insert({
-                machine_id: mid,
-                health_label: label,
-                health_score: score,
+                machine_id:          mid,
+                health_label:        label,
+                health_score:        score,
                 failure_probability: prob,
-                will_fail: p.task_A.will_fail_within_7days,
-                risk_level: p.task_A.risk_level,
-                recommendation: p.recommendation,
-                is_resolved: false,
+                will_fail:           p.task_A.will_fail_within_7days,
+                risk_level:          p.task_A.risk_level,
+                recommendation:      p.recommendation,
+                is_resolved:         false,
               })
               .select("id")
               .single();
@@ -172,16 +226,16 @@ export default function AlertsPage() {
           }
 
           newAlerts.push({
-            id         : predId,
+            id:          predId,
             severity,
-            machine    : mid,
-            message    : getMessage(severity, sensorMap, score, prob),
-            category   : getCategory(sensorMap),
-            time       : new Date(sensor.timestamp).toLocaleString("id-ID", {
+            machine:     mid,
+            message:     getMessage(severity, sensorMap, score, prob),
+            category:    getCategory(sensorMap),
+            time:        new Date(sensor.timestamp).toLocaleString("id-ID", {
               day: "2-digit", month: "2-digit", year: "numeric",
               hour: "2-digit", minute: "2-digit",
             }),
-            resolved   : resolvedMachines.has(mid),
+            resolved:    isResolved,
             failureProb: prob,
             healthScore: score,
           });
@@ -209,10 +263,15 @@ export default function AlertsPage() {
     return () => clearInterval(interval);
   }, [fetchAlerts]);
 
-  // ── Tandai Selesai — simpan permanen ke Supabase ──
+  // ── Tandai Selesai ────────────────────────────────────────────────────────────
+  // 1. Update predictions → is_resolved: true
+  // 2. Insert sensor normal → mesin kembali sehat
+  // 3. Jika di-test rusak lagi via Supabase → karena sensor baru > resolved_at, alert muncul lagi
   async function resolveAlert(alertId: string, machineId: string) {
     try {
       setResolvingId(alertId);
+
+      // Step 1: Tandai semua predictions mesin ini sebagai resolved
       await supabase
         .from("predictions")
         .update({
@@ -222,9 +281,29 @@ export default function AlertsPage() {
         .eq("machine_id", machineId)
         .eq("is_resolved", false);
 
-      setAlerts(prev => prev.map(a =>
-        a.id === alertId ? { ...a, resolved: true } : a
-      ));
+      // Step 2: Insert sensor normal ke sensor_readings
+      const normalValues = NORMAL_SENSOR_VALUES[machineId] ?? DEFAULT_NORMAL;
+      await supabase
+        .from("sensor_readings")
+        .insert({
+          machine_id:        machineId,
+          timestamp:         new Date().toISOString(),
+          temperature:       normalValues.temperature,
+          vibration:         normalValues.vibration,
+          pressure:          normalValues.pressure,
+          rpm:               normalValues.rpm,
+          power_consumption: normalValues.power_consumption,
+          noise_level:       normalValues.noise_level,
+          humidity:          normalValues.humidity,
+          operating_hours:   0,
+          failure:           0,
+        });
+
+      // Step 3: Update UI langsung
+      setAlerts(prev =>
+        prev.map(a => a.id === alertId ? { ...a, resolved: true } : a)
+      );
+
     } catch (err) {
       console.error("Gagal resolve:", err);
     } finally {
@@ -232,6 +311,7 @@ export default function AlertsPage() {
     }
   }
 
+  // ── Derived state ─────────────────────────────────────────────────────────────
   const activeAlerts   = alerts.filter(a => !a.resolved);
   const resolvedAlerts = alerts.filter(a => a.resolved);
 
@@ -242,11 +322,12 @@ export default function AlertsPage() {
   });
 
   const totalPages       = Math.ceil(filtered.length / PAGE_SIZE);
-  const paginated        = filtered.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
+  const paginated        = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const criticalCount    = activeAlerts.filter(a => a.severity === "CRITICAL").length;
   const warningCount     = activeAlerts.filter(a => a.severity === "WARNING").length;
   const affectedMachines = new Set(activeAlerts.map(a => a.machine)).size;
 
+  // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div className="p-6">
       {/* Header */}
@@ -256,13 +337,18 @@ export default function AlertsPage() {
           <p className="text-[12px] text-zinc-500 mt-0.5">
             {criticalCount} Kritis · {warningCount} Peringatan
             {lastUpdate && ` · Update: ${lastUpdate}`} ·{" "}
-            <button onClick={fetchAlerts} className="text-zinc-400 hover:text-white underline underline-offset-2 transition-colors">
+            <button
+              onClick={fetchAlerts}
+              className="text-zinc-400 hover:text-white underline underline-offset-2 transition-colors"
+            >
               Refresh
             </button>
           </p>
         </div>
-        <button onClick={() => exportAlerts(alerts)}
-          className="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-300 text-[12px] font-medium px-4 py-2 rounded-lg transition-colors">
+        <button
+          onClick={() => exportAlerts(alerts)}
+          className="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-300 text-[12px] font-medium px-4 py-2 rounded-lg transition-colors"
+        >
           ↓ Export Laporan
         </button>
       </div>
@@ -271,7 +357,10 @@ export default function AlertsPage() {
       {error && (
         <div className="mb-4 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 flex items-center justify-between">
           <p className="text-[12px] text-red-400">{error}</p>
-          <button onClick={fetchAlerts} className="text-[11px] text-red-400 border border-red-500/30 px-3 py-1.5 rounded-lg hover:bg-red-500/10">
+          <button
+            onClick={fetchAlerts}
+            className="text-[11px] text-red-400 border border-red-500/30 px-3 py-1.5 rounded-lg hover:bg-red-500/10"
+          >
             Coba Lagi
           </button>
         </div>
@@ -279,7 +368,9 @@ export default function AlertsPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3 mb-5">
-        {loading ? Array.from({length:3}).map((_,i) => <Skeleton key={i} className="h-20 rounded-xl"/>) : (
+        {loading ? (
+          Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-xl" />)
+        ) : (
           <>
             <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
               <p className="text-[11px] text-zinc-500 mb-1">Critical Alerts</p>
@@ -299,11 +390,16 @@ export default function AlertsPage() {
 
       {/* Filter */}
       <div className="flex gap-2 mb-4">
-        {(["Semua","Kritis","Warning"] as FilterType[]).map(f => (
-          <button key={f} onClick={() => { setFilter(f); setPage(1); }}
+        {(["Semua", "Kritis", "Warning"] as FilterType[]).map(f => (
+          <button
+            key={f}
+            onClick={() => { setFilter(f); setPage(1); }}
             className={`text-[12px] px-4 py-1.5 rounded-full transition-colors ${
-              filter === f ? "bg-white/15 text-white" : "text-zinc-500 hover:text-zinc-300 bg-white/5"
-            }`}>
+              filter === f
+                ? "bg-white/15 text-white"
+                : "text-zinc-500 hover:text-zinc-300 bg-white/5"
+            }`}
+          >
             {f}
           </button>
         ))}
@@ -312,7 +408,7 @@ export default function AlertsPage() {
       {/* Active Alerts */}
       {loading ? (
         <div className="flex flex-col gap-3 mb-6">
-          {Array.from({length:3}).map((_,i) => <Skeleton key={i} className="h-24 rounded-xl"/>)}
+          {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
         </div>
       ) : filtered.length === 0 ? (
         <div className="bg-[#18191c] border border-white/5 rounded-xl py-10 text-center mb-6">
@@ -322,38 +418,58 @@ export default function AlertsPage() {
       ) : (
         <div className="flex flex-col gap-3 mb-4">
           {paginated.map(a => (
-            <div key={a.id} className={`bg-[#18191c] border rounded-xl p-4 border-l-2 ${
-              a.severity === "CRITICAL" ? "border-l-red-500 border-white/5" : "border-l-amber-400 border-white/5"
-            }`}>
+            <div
+              key={a.id}
+              className={`bg-[#18191c] border rounded-xl p-4 border-l-2 ${
+                a.severity === "CRITICAL"
+                  ? "border-l-red-500 border-white/5"
+                  : "border-l-amber-400 border-white/5"
+              }`}
+            >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                      a.severity === "CRITICAL" ? "bg-red-500 text-white" : "bg-amber-400 text-amber-900"
-                    }`}>{a.severity}</span>
+                      a.severity === "CRITICAL"
+                        ? "bg-red-500 text-white"
+                        : "bg-amber-400 text-amber-900"
+                    }`}>
+                      {a.severity}
+                    </span>
                     <span className="text-[12px] font-medium text-zinc-300">{a.machine}</span>
                     <span className="text-[11px] text-zinc-600">{a.time}</span>
                   </div>
                   <p className="text-[13px] text-zinc-200 mb-1">{a.message}</p>
                   <p className="text-[11px] text-zinc-500">
                     Category: {a.category} ·
-                    Failure prob: <span className={a.failureProb >= 0.5 ? "text-red-400" : "text-amber-400"}>
-                      {(a.failureProb*100).toFixed(1)}%
-                    </span> ·
-                    Health: <span className={a.healthScore < 40 ? "text-red-400" : a.healthScore < 70 ? "text-amber-400" : "text-green-400"}>
+                    Failure prob:{" "}
+                    <span className={a.failureProb >= 0.5 ? "text-red-400" : "text-amber-400"}>
+                      {(a.failureProb * 100).toFixed(1)}%
+                    </span>{" "}
+                    · Health:{" "}
+                    <span className={
+                      a.healthScore < 40
+                        ? "text-red-400"
+                        : a.healthScore < 70
+                        ? "text-amber-400"
+                        : "text-green-400"
+                    }>
                       {a.healthScore}%
                     </span>
                   </p>
                 </div>
                 <div className="flex items-center gap-2 ml-4 shrink-0">
-                  <Link href={`/machines/${a.machine}`}
-                    className="text-[11px] bg-green-500 hover:bg-green-400 text-white px-3 py-1.5 rounded-lg transition-colors font-medium">
+                  <Link
+                    href={`/machines/${a.machine}`}
+                    className="text-[11px] bg-green-500 hover:bg-green-400 text-white px-3 py-1.5 rounded-lg transition-colors font-medium"
+                  >
                     Lihat Mesin
                   </Link>
                   <button
                     onClick={() => resolveAlert(a.id, a.machine)}
                     disabled={resolvingId === a.id}
-                    className="text-[11px] bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-400 hover:text-white px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+                    className="text-[11px] bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-400 hover:text-white px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                  >
                     {resolvingId === a.id ? "Menyimpan..." : "Tandai Selesai"}
                   </button>
                 </div>
@@ -366,20 +482,31 @@ export default function AlertsPage() {
       {/* Pagination */}
       {!loading && totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 mb-6">
-          <button onClick={() => setPage(p => Math.max(1,p-1))} disabled={page===1}
-            className="text-[11px] text-zinc-400 hover:text-white disabled:opacity-30 px-3 py-1.5 rounded border border-white/10 transition-colors">
+          <button
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="text-[11px] text-zinc-400 hover:text-white disabled:opacity-30 px-3 py-1.5 rounded border border-white/10 transition-colors"
+          >
             Previous
           </button>
-          {Array.from({length: totalPages}).map((_,i) => (
-            <button key={i} onClick={() => setPage(i+1)}
+          {Array.from({ length: totalPages }).map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setPage(i + 1)}
               className={`text-[11px] px-3 py-1.5 rounded border transition-colors ${
-                page === i+1 ? "bg-white/15 text-white border-white/20" : "text-zinc-400 hover:text-white border-white/10"
-              }`}>
-              {i+1}
+                page === i + 1
+                  ? "bg-white/15 text-white border-white/20"
+                  : "text-zinc-400 hover:text-white border-white/10"
+              }`}
+            >
+              {i + 1}
             </button>
           ))}
-          <button onClick={() => setPage(p => Math.min(totalPages,p+1))} disabled={page===totalPages}
-            className="text-[11px] text-zinc-400 hover:text-white disabled:opacity-30 px-3 py-1.5 rounded border border-white/10 transition-colors">
+          <button
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+            className="text-[11px] text-zinc-400 hover:text-white disabled:opacity-30 px-3 py-1.5 rounded border border-white/10 transition-colors"
+          >
             Next
           </button>
         </div>
@@ -391,25 +518,36 @@ export default function AlertsPage() {
           <p className="text-[10px] font-medium tracking-widest text-zinc-600 mb-3">RESOLVED</p>
           <div className="bg-[#18191c] border border-white/5 rounded-xl overflow-hidden opacity-60">
             {resolvedAlerts.map((a, i) => (
-              <div key={a.id} className={`flex items-start justify-between px-4 py-4 ${
-                i < resolvedAlerts.length-1 ? "border-b border-white/5" : ""
-              }`}>
+              <div
+                key={a.id}
+                className={`flex items-start justify-between px-4 py-4 ${
+                  i < resolvedAlerts.length - 1 ? "border-b border-white/5" : ""
+                }`}
+              >
                 <div className="flex items-start gap-3">
                   <div className={`w-[3px] h-9 rounded-full shrink-0 mt-0.5 ${
                     a.severity === "CRITICAL" ? "bg-red-500" : "bg-amber-400"
-                  }`}/>
+                  }`} />
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                        a.severity === "CRITICAL" ? "bg-red-500 text-white" : "bg-amber-400 text-amber-900"
-                      }`}>{a.severity}</span>
+                        a.severity === "CRITICAL"
+                          ? "bg-red-500 text-white"
+                          : "bg-amber-400 text-amber-900"
+                      }`}>
+                        {a.severity}
+                      </span>
                       <span className="text-[11px] text-zinc-400">{a.machine}</span>
-                      <span className="text-[10px] text-green-400 border border-green-500/30 px-1.5 py-0.5 rounded">Resolved ✓</span>
+                      <span className="text-[10px] text-green-400 border border-green-500/30 px-1.5 py-0.5 rounded">
+                        Resolved ✓
+                      </span>
                     </div>
                     <p className="text-[12px] text-zinc-500">{a.message}</p>
                   </div>
                 </div>
-                <span className="text-[11px] text-zinc-600 whitespace-nowrap ml-4 pt-0.5">{a.time}</span>
+                <span className="text-[11px] text-zinc-600 whitespace-nowrap ml-4 pt-0.5">
+                  {a.time}
+                </span>
               </div>
             ))}
           </div>

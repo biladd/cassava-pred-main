@@ -11,6 +11,7 @@ const navItems = [
   { label: "Alerts",       href: "/alerts",       icon: "🔔" },
   { label: "History",      href: "/history",      icon: "🕐" },
   { label: "Cost Analysis",href: "/cost-analysis",icon: "$" },
+  { label: "AI Chat(tahap pengembangan)",      href: "/chat",         icon: "🤖" },
 ];
 
 interface MachineStatus {

@@ -115,6 +115,15 @@ function SensorChart({ data }: { data: SensorTrend[] }) {
   );
 }
 
+
+function formatRUL(rulHours: number): string {
+  if (rulHours >= 999) return "> 7.0d";
+  if (rulHours >= 168) return "7.0d";
+  if (rulHours >= 24) return `${(rulHours / 24).toFixed(1)}d`;
+  return `${Math.round(rulHours)}j`;
+}
+
+
 function Skeleton({ className }: { className?: string }) {
   return <div className={`animate-pulse bg-white/5 rounded ${className}`}/>;
 }
@@ -196,8 +205,8 @@ export default function DashboardPage() {
         failureProb: p.task_A.failure_probability,
         willFail: p.task_A.will_fail_within_7days,
         riskLevel: p.task_A.risk_level,
-        rulHours: p.task_C?.rul_hours ?? 168,
-        rulCapped: p.task_C?.rul_capped ?? false,
+        rulHours: p.task_C?.rul_hours ?? 999,
+        rulCapped: p.task_C?.rul_capped ?? true,
         isAnomaly: p.anomaly?.is_anomaly ?? false,
         anomalyScore: p.anomaly?.score ?? 0,
         recommendation: p.recommendation,
@@ -371,8 +380,13 @@ useEffect(() => {
                     <p className="text-[10px] text-zinc-600">
                       Temp: {m.latestSensor.temperature}°C · Vib: {m.latestSensor.vibration} · RPM: {m.latestSensor.rpm}
                       {" · "}
-                      <span className={m.rulHours < 48 ? "text-red-400" : "text-zinc-600"}>
-                        RUL: {m.rulHours}j{m.rulCapped ? " (max)" : ""}
+                      <span className={
+                        m.rulHours < 24 ? "text-red-500" :
+                        m.rulHours < 72 ? "text-red-400" :
+                        m.rulHours < 168 ? "text-amber-400" :
+                        "text-zinc-600"
+                      }>
+                        RUL: {formatRUL(m.rulHours)}
                       </span>
                     </p>
                     <p className="text-[10px] text-zinc-600">

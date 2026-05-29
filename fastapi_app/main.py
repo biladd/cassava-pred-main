@@ -316,6 +316,29 @@ def build_feature_vector(data: SensorInput) -> np.ndarray:
     return vec
 
 
+def calculate_display_rul(rul_hours: float, fail_prob: float) -> float:
+    """
+    Hybrid RUL: gabungkan output Task C + Task A.
+    Jika Task C stuck di cap 168h, estimasi dari fail_prob Task A.
+    """
+    # Jika Task C prediksi spesifik (< 167.5) → pakai langsung
+    if rul_hours < 167.5:
+        return round(rul_hours, 2)
+
+    # Task C stuck di 168 → estimasi dari fail_prob Task A
+    if fail_prob >= 0.50:
+        # Kritis: estimasi 0–72 jam
+        estimated = (1.0 - fail_prob) * 144.0
+    elif fail_prob >= 0.20:
+        # Warning: estimasi 72–168 jam
+        estimated = 72.0 + (1.0 - fail_prob) * 120.0
+    else:
+        # Aman: lebih dari 7 hari → return 999 sebagai sentinel
+        return 999.0
+
+    return round(estimated, 2)
+
+
 def predict_rul_from_vector(vec_83: np.ndarray) -> float:
     """Predict RUL dari single feature vector (replikasi jadi sequence 24-step)."""
     # Pad/truncate ke n_features LSTM
@@ -333,6 +356,9 @@ def predict_rul_from_vector(vec_83: np.ndarray) -> float:
     rul_hours = float(scaler_rul_y.inverse_transform([[rul_scaled]])[0, 0])
     rul_hours = rul_hours + RUL_BIAS  # bias correction
     return float(np.clip(rul_hours, 0, RUL_CAP))
+
+
+
 
 
 def predict_anomaly_from_vector(vec_83: np.ndarray) -> tuple:
@@ -588,14 +614,15 @@ def predict_full(data: SensorInput):
         health_label = HEALTH_LABELS[str(pred_B)]
 
         # Task C
-        rul_hours = predict_rul_from_vector(vec)
+        rul_hours_raw = predict_rul_from_vector(vec)      # 0–168, untuk health score
+        rul_hours = calculate_display_rul(rul_hours_raw, proba_A)  # untuk display
 
         # Anomaly
         anom_score, is_anom = predict_anomaly_from_vector(vec)
 
         # Overall health score (0-100)
         health_score = int(np.clip(
-            100 * (1 - proba_A) * (rul_hours / RUL_CAP) * (1 - 0.2 * is_anom),
+            100 * (1 - proba_A) * (rul_hours_raw / RUL_CAP) * (1 - 0.2 * is_anom),
             0, 100
         ))
 
@@ -618,9 +645,9 @@ def predict_full(data: SensorInput):
                 },
             },
             "task_C": {
-                "rul_hours": round(rul_hours, 2),
-                "rul_days": round(rul_hours / 24, 2),
-                "rul_capped": rul_hours >= RUL_CAP,
+                "rul_hours": round(rul_hours, 2) if rul_hours < 999 else 999,
+                "rul_days": round(rul_hours / 24, 2) if rul_hours < 999 else 999,
+                "rul_capped": rul_hours >= 999,
             },
             "anomaly": {
                 "score": round(anom_score, 4),

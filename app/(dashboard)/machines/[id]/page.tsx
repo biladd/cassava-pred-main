@@ -183,6 +183,15 @@ function TypeBadge({ type }: { type: MaintenanceRecord["type"] }) {
   return <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${styles[type]}`}>{type}</span>;
 }
 
+
+function formatRUL(rulHours: number): string {
+  if (rulHours >= 999) return "> 7.0d";
+  if (rulHours >= 168) return "7.0d";
+  if (rulHours >= 24) return `${(rulHours / 24).toFixed(1)}d`;
+  return `${Math.round(rulHours)}j`;
+}
+
+
 // ── Skeleton ───────────────────────────────────────────────────────────────
 function Skeleton({ className }: { className?: string }) {
   return <div className={`animate-pulse bg-white/5 rounded ${className}`}/>;
@@ -491,10 +500,11 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
             machine.rulHours < 168 ? "text-amber-400" :
             "text-green-400"
           }`}>
-            {machine.rulDays.toFixed(1)}d
+            {formatRUL(machine.rulHours)}
           </p>
           <p className="text-[11px] text-zinc-500 mt-1">
-            {machine.rulHours}j{machine.rulCapped ? " (max)" : ""}
+            {machine.rulHours >= 999 ? "Lebih dari 7 hari" : `${machine.rulHours}j`}
+            {machine.rulCapped ? " (> 7d)" : ""}
           </p>
         </div>
 
@@ -626,7 +636,9 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
       <div className="flex justify-between items-center mb-1.5">
         <span className="text-[11px] text-zinc-400">Task C · Remaining Useful Life (LSTM)</span>
         <span className={`text-[11px] font-semibold ${machine.rulHours < 24 ? "text-red-500" : machine.rulHours < 72 ? "text-red-400" : machine.rulHours < 168 ? "text-amber-400" : "text-green-400"}`}>
-          {machine.rulHours}j ({machine.rulDays.toFixed(1)}d) {machine.rulCapped && "· capped"}
+          {formatRUL(machine.rulHours)}
+          {machine.rulHours < 999 && ` (${machine.rulHours}j)`}
+          {machine.rulCapped && " · > 7d"}
         </span>
       </div>
       <div className="h-2 bg-white/5 rounded-full overflow-hidden relative">

@@ -19,7 +19,7 @@ interface HistoryRecord {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function fmt(n: number) {
-  return "Rp " + n.toLocaleString("id-ID");
+  return "Rp " + n.toLocaleString("en-US");
 }
 
 function TypeBadge({ type }: { type: RecordType }) {
@@ -37,7 +37,7 @@ function Skeleton({ className }: { className?: string }) {
 
 // ── Export CSV ─────────────────────────────────────────────────────────────
 function exportToCSV(records: HistoryRecord[]) {
-  const headers = ["Tanggal","Mesin","Tipe","Downtime (jam)","Biaya (Rp)","Catatan","Teknisi"];
+  const headers = ["Date", "Machine", "Type", "Downtime (hrs)", "Cost (Rp)", "Notes", "Technician"];
   const rows = records.map(r => [
     r.date, r.machine, r.type,
     r.downtime.toString(),
@@ -60,7 +60,7 @@ function exportToCSV(records: HistoryRecord[]) {
 function MonthlyChart({ records }: { records: HistoryRecord[] }) {
   const monthMap: Record<string, { Emergency: number; Corrective: number; Preventive: number }> = {};
   for (const r of records) {
-    const m = new Date(r.date).toLocaleDateString("id-ID", { month: "short" });
+    const m = new Date(r.date).toLocaleDateString("en-US", { month: "short" });
     if (!monthMap[m]) monthMap[m] = { Emergency: 0, Corrective: 0, Preventive: 0 };
     monthMap[m][r.type]++;
   }
@@ -156,7 +156,7 @@ export default function HistoryPage() {
 
       const rows: HistoryRecord[] = (data ?? []).map((r, i) => ({
         id         : i + 1,
-        date       : new Date(r.date).toLocaleDateString("id-ID"),
+        date       : new Date(r.date).toLocaleDateString("en-US"),
         machine    : r.machine_id,
         type       : r.maintenance_type as RecordType,
         downtime   : Number(r.downtime_hours) || 0,
@@ -167,7 +167,7 @@ export default function HistoryPage() {
 
       setRecords(rows);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Gagal fetch data");
+      setError(err instanceof Error ? err.message : "Failed to fetch data");
     } finally {
       setLoading(false);
     }
@@ -201,7 +201,7 @@ export default function HistoryPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-lg font-medium text-white">Maintenance History</h1>
-          <p className="text-[12px] text-zinc-500 mt-0.5">Data real dari Supabase</p>
+          <p className="text-[12px] text-zinc-500 mt-0.5">Real data from Supabase</p>
         </div>
         <button
           onClick={() => exportToCSV(filtered)}
@@ -225,22 +225,22 @@ export default function HistoryPage() {
             <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
               <p className="text-[11px] text-zinc-500 mb-1">Total Maintenance</p>
               <p className="text-2xl font-medium text-white">{records.length}</p>
-              <p className="text-[11px] text-zinc-600">Semua aktivitas</p>
+              <p className="text-[11px] text-zinc-600">All activities</p>
             </div>
             <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
               <p className="text-[11px] text-zinc-500 mb-1">Total Downtime</p>
-              <p className="text-2xl font-medium text-white">{totalDowntime.toFixed(0)} jam</p>
-              <p className="text-[11px] text-zinc-600">Akumulasi semua mesin</p>
+              <p className="text-2xl font-medium text-white">{totalDowntime.toFixed(0)} hrs</p>
+              <p className="text-[11px] text-zinc-600">Accumulated across all machines</p>
             </div>
             <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
               <p className="text-[11px] text-zinc-500 mb-1">Total Cost</p>
               <p className="text-2xl font-medium text-white">{fmt(totalCost)}</p>
-              <p className="text-[11px] text-zinc-600">Semua tipe maintenance</p>
+              <p className="text-[11px] text-zinc-600">All maintenance types</p>
             </div>
             <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
               <p className="text-[11px] text-zinc-500 mb-1">Emergency Rate</p>
               <p className={`text-2xl font-medium ${emergencyRate > 20 ? "text-red-400" : "text-amber-400"}`}>{emergencyRate}%</p>
-              <p className="text-[11px] text-zinc-600">{emergencyCount} dari {records.length} total</p>
+              <p className="text-[11px] text-zinc-600">{emergencyCount} out of {records.length} total</p>
             </div>
           </>
         )}
@@ -299,14 +299,14 @@ export default function HistoryPage() {
                   className={`text-[10px] px-2 py-1 rounded transition-colors ${
                     filterType === t ? "bg-white/15 text-white" : "text-zinc-500 hover:text-zinc-300"
                   }`}>
-                  {t === "all" ? "Semua" : t}
+                  {t === "all" ? "All" : t}
                 </button>
               ))}
             </div>
             {/* Search */}
             <input
               type="text"
-              placeholder="Cari..."
+              placeholder="Search..."
               value={search}
               onChange={e => { setSearch(e.target.value); setPage(1); }}
               className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-[11px] text-zinc-300 placeholder-zinc-600 focus:outline-none w-32"
@@ -317,7 +317,7 @@ export default function HistoryPage() {
         <table className="w-full">
           <thead>
             <tr className="border-b border-white/5">
-              {["Tanggal","Mesin","Tipe","Downtime","Biaya","Catatan","Teknisi"].map(h => (
+              {["Date", "Machine", "Type", "Downtime", "Cost", "Notes", "Technician"].map(h => (
                 <th key={h} className="text-left text-[11px] font-medium text-zinc-500 px-4 py-3">{h}</th>
               ))}
             </tr>
@@ -334,7 +334,7 @@ export default function HistoryPage() {
                 <td className="px-4 py-3 text-[12px] text-zinc-400">{r.date}</td>
                 <td className="px-4 py-3 text-[12px] font-medium text-blue-400">{r.machine}</td>
                 <td className="px-4 py-3"><TypeBadge type={r.type}/></td>
-                <td className="px-4 py-3 text-[12px] text-zinc-400">{r.downtime.toFixed(1)} jam</td>
+                <td className="px-4 py-3 text-[12px] text-zinc-400">{r.downtime.toFixed(1)} hrs</td>
                 <td className="px-4 py-3 text-[12px] text-zinc-400">{fmt(r.cost)}</td>
                 <td className="px-4 py-3 text-[12px] text-zinc-500 max-w-[200px] truncate">{r.note}</td>
                 <td className="px-4 py-3 text-[12px] text-zinc-500">{r.technician}</td>
@@ -348,7 +348,7 @@ export default function HistoryPage() {
                   Total ({filtered.length} records)
                 </td>
                 <td className="px-4 py-3 text-[12px] text-zinc-400">
-                  {filtered.reduce((a,r) => a + r.downtime, 0).toFixed(1)} jam
+                  {filtered.reduce((a,r) => a + r.downtime, 0).toFixed(1)} hrs
                 </td>
                 <td className="px-4 py-3 text-[12px] font-medium text-white">
                   {fmt(filtered.reduce((a,r) => a + r.cost, 0))}
@@ -361,28 +361,67 @@ export default function HistoryPage() {
 
         {/* Pagination */}
         {!loading && totalPages > 1 && (
-          <div className="flex items-center justify-center gap-2 px-4 py-3 border-t border-white/5">
-            <button onClick={() => setPage(p => Math.max(1, p-1))} disabled={page === 1}
+          <div className="flex items-center justify-center gap-1.5 px-4 py-3 border-t border-white/5">
+            {/* First + Prev */}
+            <button onClick={() => setPage(1)} disabled={page === 1}
+              className="text-[11px] text-zinc-400 hover:text-white disabled:opacity-30 px-2 py-1.5 rounded border border-white/10 transition-colors">
+              «
+            </button>
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
               className="text-[11px] text-zinc-400 hover:text-white disabled:opacity-30 px-3 py-1.5 rounded border border-white/10 transition-colors">
               Previous
             </button>
-            {Array.from({length: totalPages}).map((_, i) => (
-              <button key={i} onClick={() => setPage(i+1)}
-                className={`text-[11px] px-3 py-1.5 rounded border transition-colors ${
-                  page === i+1 ? "bg-white/15 text-white border-white/20" : "text-zinc-400 hover:text-white border-white/10"
-                }`}>
-                {i+1}
-              </button>
-            ))}
-            <button onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page === totalPages}
+
+            {/* Page numbers with ellipsis */}
+            {(() => {
+              const delta = 2;
+              const pages: (number | "...")[] = [];
+              const left  = page - delta;
+              const right = page + delta;
+
+              for (let i = 1; i <= totalPages; i++) {
+                if (i === 1 || i === totalPages || (i >= left && i <= right)) {
+                  pages.push(i);
+                } else if (pages[pages.length - 1] !== "...") {
+                  pages.push("...");
+                }
+              }
+
+              return pages.map((p, i) =>
+                p === "..." ? (
+                  <span key={`ellipsis-${i}`} className="text-[11px] text-zinc-600 px-1">…</span>
+                ) : (
+                  <button key={p} onClick={() => setPage(p)}
+                    className={`text-[11px] px-3 py-1.5 rounded border transition-colors ${
+                      page === p
+                        ? "bg-white/15 text-white border-white/20"
+                        : "text-zinc-400 hover:text-white border-white/10"
+                    }`}>
+                    {p}
+                  </button>
+                )
+              );
+            })()}
+
+            {/* Next + Last */}
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
               className="text-[11px] text-zinc-400 hover:text-white disabled:opacity-30 px-3 py-1.5 rounded border border-white/10 transition-colors">
               Next
             </button>
+            <button onClick={() => setPage(totalPages)} disabled={page === totalPages}
+              className="text-[11px] text-zinc-400 hover:text-white disabled:opacity-30 px-2 py-1.5 rounded border border-white/10 transition-colors">
+              »
+            </button>
+
+            {/* Page info */}
+            <span className="text-[11px] text-zinc-600 ml-2">
+              Page {page} of {totalPages}
+            </span>
           </div>
         )}
 
         {!loading && filtered.length === 0 && (
-          <div className="py-8 text-center text-[12px] text-zinc-500">Tidak ada data ditemukan</div>
+          <div className="py-8 text-center text-[12px] text-zinc-500">No records found</div>
         )}
       </div>
     </div>

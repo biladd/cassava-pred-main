@@ -32,8 +32,8 @@ export default function RegisterPage() {
 
   return (
     <div className="bg-white rounded-2xl shadow-xl p-8">
-      <h1 className="text-2xl font-bold text-slate-900 mb-1">Daftar Akun</h1>
-      <p className="text-sm text-slate-500 mb-6">Bikin akun baru buat akses dashboard</p>
+      <h1 className="text-2xl font-bold text-slate-900 mb-1">Register</h1>
+      <p className="text-sm text-slate-500 mb-6">Create a new account to access the dashboard</p>
 
       {error && (
         <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
@@ -101,7 +101,7 @@ export default function RegisterPage() {
               )}
             </button>
           </div>
-          <p className="text-xs text-slate-500 mt-1">Minimal 6 karakter</p>
+          <p className="text-xs text-slate-500 mt-1">Minimum 6 characters</p>
         </div>
 
         <button
@@ -109,14 +109,14 @@ export default function RegisterPage() {
           disabled={loading}
           className="w-full bg-slate-900 hover:bg-slate-700 disabled:bg-slate-400 text-white font-semibold py-2.5 rounded-lg transition text-sm"
         >
-          {loading ? 'Memproses...' : 'Daftar'}
+          {loading ? 'Memproses...' : 'Register'}
         </button>
       </form>
 
       <p className="text-sm text-center text-slate-600 mt-6">
-        Sudah punya akun?{' '}
+        already have account?{' '}
         <Link href="/login" className="text-slate-900 font-semibold hover:underline">
-          Login di sini
+          Login 
         </Link>
       </p>
     </div>

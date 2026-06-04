@@ -22,9 +22,9 @@ interface MonthlyData {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function fmt(n: number) {
-  if (n >= 1_000_000_000) return "Rp " + (n / 1_000_000_000).toFixed(1) + "M";
-  if (n >= 1_000_000)     return "Rp " + (n / 1_000_000).toFixed(1) + " jt";
-  return "Rp " + n.toLocaleString("id-ID");
+  if (n >= 1_000_000_000) return "Rp " + (n / 1_000_000_000).toFixed(1) + "B";
+  if (n >= 1_000_000)     return "Rp " + (n / 1_000_000).toFixed(1) + "M";
+  return "Rp " + n.toLocaleString("en-US");
 }
 
 function Skeleton({ className }: { className?: string }) {
@@ -35,7 +35,7 @@ function Skeleton({ className }: { className?: string }) {
 function ROIChart({ data }: { data: MonthlyData[] }) {
   if (data.length === 0) return (
     <div className="h-40 flex items-center justify-center">
-      <p className="text-[11px] text-zinc-600">Tidak ada data</p>
+      <p className="text-[11px] text-zinc-600">No data available</p>
     </div>
   );
 
@@ -72,10 +72,10 @@ function ROIChart({ data }: { data: MonthlyData[] }) {
 
 // ── Page ───────────────────────────────────────────────────────────────────
 export default function CostAnalysisPage() {
-  const [costData, setCostData]     = useState<CostItem[]>([]);
-  const [monthly, setMonthly]       = useState<MonthlyData[]>([]);
-  const [loading, setLoading]       = useState(true);
-  const [error, setError]           = useState<string | null>(null);
+  const [costData, setCostData] = useState<CostItem[]>([]);
+  const [monthly, setMonthly]   = useState<MonthlyData[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState<string | null>(null);
 
   const fetchCostData = useCallback(async () => {
     try {
@@ -87,9 +87,9 @@ export default function CostAnalysisPage() {
         .order("date", { ascending: true });
 
       if (mErr) throw new Error(`Supabase: ${mErr.message}`);
-      if (!maintData || maintData.length === 0) throw new Error("Tidak ada data maintenance");
+      if (!maintData || maintData.length === 0) throw new Error("No maintenance data found");
 
-      // ── Per mesin ──
+      // ── Per machine ──
       const machineMap: Record<string, CostItem> = {};
       for (const row of maintData) {
         const mid = row.machine_id;
@@ -98,7 +98,7 @@ export default function CostAnalysisPage() {
         }
         const cost = Number(row.cost_idr) || 0;
         const dt   = Number(row.downtime_hours) || 0;
-        machineMap[mid].total        += cost;
+        machineMap[mid].total         += cost;
         machineMap[mid].downtimeHours += dt;
         if (row.maintenance_type === "Emergency")  { machineMap[mid].emergency += cost; machineMap[mid].emergencyCount++; }
         if (row.maintenance_type === "Corrective") machineMap[mid].corrective += cost;
@@ -111,7 +111,7 @@ export default function CostAnalysisPage() {
       // ── Monthly ROI ──
       const monthMap: Record<string, { emergency: number; corrective: number; preventive: number; savings: number }> = {};
       for (const row of maintData) {
-        const m = new Date(row.date).toLocaleDateString("id-ID", { month: "short", year: "2-digit" });
+        const m = new Date(row.date).toLocaleDateString("en-US", { month: "short", year: "2-digit" });
         if (!monthMap[m]) monthMap[m] = { emergency: 0, corrective: 0, preventive: 0, savings: 0 };
         const cost = Number(row.cost_idr) || 0;
         if (row.maintenance_type === "Emergency")  monthMap[m].emergency  += cost;
@@ -120,13 +120,13 @@ export default function CostAnalysisPage() {
       }
 
       // ROI = (savings / preventive_cost) * 100
-      // Savings = estimasi biaya emergency yang berhasil dihindari dengan preventive
-      const EMERGENCY_AVG = 8_500_000; // avg biaya emergency per kejadian
+      // Savings = estimated emergency cost avoided through preventive maintenance
+      const EMERGENCY_AVG = 8_500_000; // avg emergency cost per incident
       let cumROI = 0;
       const monthlyRows: MonthlyData[] = Object.entries(monthMap).map(([month, d], i) => {
-        const prevented  = Math.max(0, (d.preventive / 1_500_000) * 0.8); // estimasi failure dicegah
-        const savings    = prevented * EMERGENCY_AVG - d.preventive;
-        const roi        = d.preventive > 0 ? Math.round(((savings) / d.preventive) * 100 + 50) : 50;
+        const prevented = Math.max(0, (d.preventive / 1_500_000) * 0.8); // estimated failures prevented
+        const savings   = prevented * EMERGENCY_AVG - d.preventive;
+        const roi       = d.preventive > 0 ? Math.round(((savings) / d.preventive) * 100 + 50) : 50;
         cumROI = Math.min(200, Math.max(cumROI, roi + i * 15));
         return { month, roi: cumROI, savings: Math.max(0, savings) };
       });
@@ -134,7 +134,7 @@ export default function CostAnalysisPage() {
       setMonthly(monthlyRows.slice(-6));
 
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Gagal fetch data");
+      setError(err instanceof Error ? err.message : "Failed to fetch data");
     } finally {
       setLoading(false);
     }
@@ -151,8 +151,8 @@ export default function CostAnalysisPage() {
   const totalEmergencies = costData.reduce((a, c) => a + c.emergencyCount, 0);
   const maxTotal         = Math.max(...costData.map(c => c.total), 1);
 
-  // ROI & Savings estimasi
-  const EMERGENCY_AVG    = 8_500_000;
+  // ROI & Savings estimation
+  const EMERGENCY_AVG     = 8_500_000;
   const preventedFailures = Math.round(totalPreventive / 1_500_000 * 0.8);
   const totalSavings      = preventedFailures * EMERGENCY_AVG;
   const roi               = totalPreventive > 0 ? Math.round((totalSavings / totalPreventive) * 100) : 0;
@@ -163,7 +163,7 @@ export default function CostAnalysisPage() {
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-lg font-medium text-white">Cost Analysis</h1>
-        <p className="text-[12px] text-zinc-500 mt-0.5">ROI analysis untuk implementasi predictive maintenance</p>
+        <p className="text-[12px] text-zinc-500 mt-0.5">ROI analysis for predictive maintenance implementation</p>
       </div>
 
       {/* Error */}
@@ -180,12 +180,12 @@ export default function CostAnalysisPage() {
             <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
               <p className="text-[11px] text-zinc-500 mb-1">Total Savings (est.)</p>
               <p className="text-xl font-medium text-green-400">{fmt(totalSavings)}</p>
-              <p className="text-[10px] text-zinc-500 mt-1">dari preventive maintenance</p>
+              <p className="text-[10px] text-zinc-500 mt-1">from preventive maintenance</p>
             </div>
             <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
               <p className="text-[11px] text-zinc-500 mb-1">Downtime Reduction</p>
               <p className="text-xl font-medium text-blue-400">{downtimeReduction}%</p>
-              <p className="text-[10px] text-zinc-500 mt-1">vs tanpa predictive</p>
+              <p className="text-[10px] text-zinc-500 mt-1">vs without predictive</p>
             </div>
             <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
               <p className="text-[11px] text-zinc-500 mb-1">ROI</p>
@@ -195,7 +195,7 @@ export default function CostAnalysisPage() {
             <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
               <p className="text-[11px] text-zinc-500 mb-1">Failures Prevented</p>
               <p className="text-xl font-medium text-white">{preventedFailures}</p>
-              <p className="text-[10px] text-red-400 mt-1">{totalEmergencies} emergency terjadi</p>
+              <p className="text-[10px] text-red-400 mt-1">{totalEmergencies} emergencies occurred</p>
             </div>
           </>
         )}
@@ -208,7 +208,7 @@ export default function CostAnalysisPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-white/5">
-                {["Metric","Before","After","Savings"].map(h => (
+                {["Metric", "Before", "After", "Savings"].map(h => (
                   <th key={h} className="text-left text-[11px] font-medium text-zinc-500 px-3 py-2">{h}</th>
                 ))}
               </tr>
@@ -216,17 +216,17 @@ export default function CostAnalysisPage() {
             <tbody>
               {[
                 {
-                  metric: "Biaya Maintenance/Bulan",
+                  metric: "Maintenance Cost/Month",
                   before: fmt(Math.round(grandTotal / 6 * 1.8)),
                   after : fmt(Math.round(grandTotal / 6)),
                   savings: fmt(Math.round(grandTotal / 6 * 0.8)),
                   savingsColor: "text-green-400",
                 },
                 {
-                  metric: "Downtime/Bulan",
-                  before: `${Math.round(totalDowntime / 6 * 1.8)} jam`,
-                  after : `${Math.round(totalDowntime / 6)} jam`,
-                  savings: `-${Math.round(totalDowntime / 6 * 0.8)} jam`,
+                  metric: "Downtime/Month",
+                  before: `${Math.round(totalDowntime / 6 * 1.8)} hrs`,
+                  after : `${Math.round(totalDowntime / 6)} hrs`,
+                  savings: `-${Math.round(totalDowntime / 6 * 0.8)} hrs`,
                   savingsColor: "text-green-400",
                 },
                 {
@@ -262,9 +262,9 @@ export default function CostAnalysisPage() {
         {loading ? <Skeleton className="h-40"/> : <ROIChart data={monthly}/>}
       </div>
 
-      {/* Per mesin */}
+      {/* Cost per machine */}
       <div className="bg-[#18191c] border border-white/5 rounded-xl p-4 mb-4">
-        <p className="text-[13px] font-medium text-zinc-300 mb-4">Biaya per Mesin</p>
+        <p className="text-[13px] font-medium text-zinc-300 mb-4">Cost per Machine</p>
         {loading ? (
           <div className="flex flex-col gap-3">{Array.from({length:5}).map((_,i) => <Skeleton key={i} className="h-10"/>)}</div>
         ) : (
@@ -274,7 +274,7 @@ export default function CostAnalysisPage() {
                 <div className="flex justify-between items-center mb-1.5">
                   <span className="text-[12px] font-medium text-zinc-300">{c.machine}</span>
                   <div className="flex items-center gap-3">
-                    <span className="text-[11px] text-zinc-500">{c.downtimeHours.toFixed(1)} jam downtime</span>
+                    <span className="text-[11px] text-zinc-500">{c.downtimeHours.toFixed(1)} hrs downtime</span>
                     <span className="text-[12px] text-zinc-400">{fmt(c.total)}</span>
                   </div>
                 </div>
@@ -300,7 +300,7 @@ export default function CostAnalysisPage() {
         <table className="w-full">
           <thead>
             <tr className="border-b border-white/5">
-              {["Mesin","Emergency","Corrective","Preventive","Total","Downtime"].map(h => (
+              {["Machine", "Emergency", "Corrective", "Preventive", "Total", "Downtime"].map(h => (
                 <th key={h} className="text-left text-[11px] font-medium text-zinc-500 px-4 py-3">{h}</th>
               ))}
             </tr>
@@ -319,7 +319,7 @@ export default function CostAnalysisPage() {
                 <td className="px-4 py-3 text-[12px] text-amber-400">{c.corrective > 0 ? fmt(c.corrective) : "-"}</td>
                 <td className="px-4 py-3 text-[12px] text-green-400">{c.preventive > 0 ? fmt(c.preventive) : "-"}</td>
                 <td className="px-4 py-3 text-[12px] font-medium text-white">{fmt(c.total)}</td>
-                <td className="px-4 py-3 text-[12px] text-zinc-400">{c.downtimeHours.toFixed(1)} jam</td>
+                <td className="px-4 py-3 text-[12px] text-zinc-400">{c.downtimeHours.toFixed(1)} hrs</td>
               </tr>
             ))}
           </tbody>
@@ -331,7 +331,7 @@ export default function CostAnalysisPage() {
                 <td className="px-4 py-3 text-[12px] text-amber-400">{fmt(totalCorrective)}</td>
                 <td className="px-4 py-3 text-[12px] text-green-400">{fmt(totalPreventive)}</td>
                 <td className="px-4 py-3 text-[12px] font-medium text-white">{fmt(grandTotal)}</td>
-                <td className="px-4 py-3 text-[12px] text-zinc-400">{totalDowntime.toFixed(1)} jam</td>
+                <td className="px-4 py-3 text-[12px] text-zinc-400">{totalDowntime.toFixed(1)} hrs</td>
               </tr>
             </tfoot>
           )}
@@ -344,10 +344,10 @@ export default function CostAnalysisPage() {
         <div className="grid grid-cols-2 gap-x-8 gap-y-1">
           {[
             ["Model", "Random Forest + SMOTE"],
-            ["Data Coverage", `20 mesin, ${costData.length > 0 ? "6 bulan" : "-"} historical data`],
-            ["Failure Detection Rate", "9% failure rate terdeteksi"],
-            ["Avg Emergency Cost", fmt(8_500_000) + " per kejadian"],
-          ].map(([k,v]) => (
+            ["Data Coverage", `20 machines, ${costData.length > 0 ? "6 months" : "-"} historical data`],
+            ["Failure Detection Rate", "9% failure rate detected"],
+            ["Avg Emergency Cost", fmt(8_500_000) + " per incident"],
+          ].map(([k, v]) => (
             <div key={k} className="flex flex-col">
               <span className="text-[10px] text-zinc-600">{k}</span>
               <span className="text-[11px] text-zinc-400">{v}</span>
@@ -355,7 +355,7 @@ export default function CostAnalysisPage() {
           ))}
         </div>
         <p className="text-[10px] text-zinc-600 mt-3">
-          Note: ROI calculation based on actual maintenance cost data from Supabase. Savings estimation menggunakan rata-rata biaya emergency dan preventive maintenance.
+          Note: ROI calculation based on actual maintenance cost data from Supabase. Savings estimation uses average emergency and preventive maintenance costs.
         </p>
       </div>
     </div>

@@ -19,10 +19,8 @@ interface Machine {
   vibration: number;
   rpm: number;
   lastTimestamp: string;
-  rulHours: number;      
-  rulCapped: boolean;     
-  isAnomaly: boolean;    
-  anomalyScore: number;   
+  isAnomaly: boolean;
+  anomalyScore: number;
 }
 
 interface SensorReading {
@@ -81,7 +79,6 @@ export default function MachinesPage() {
     try {
       setError(null);
 
-      // 1. Ambil data sensor terbaru per mesin
       const { data: sensorData, error: sErr } = await supabase
         .from("sensor_readings")
         .select("*")
@@ -90,7 +87,6 @@ export default function MachinesPage() {
 
       if (sErr) throw new Error(`Supabase: ${sErr.message}`);
 
-      // Ambil 1 terbaru per mesin
       const latest: Record<string, SensorReading> = {};
       for (const row of (sensorData ?? [])) {
         if (!latest[row.machine_id]) latest[row.machine_id] = row;
@@ -98,7 +94,6 @@ export default function MachinesPage() {
 
       const machineIds = Object.keys(latest).sort();
 
-      // 2. Prediksi dari FastAPI
       const predictions = await Promise.all(
         machineIds.map(id => {
           const s = latest[id];
@@ -120,41 +115,37 @@ export default function MachinesPage() {
         })
       );
 
-      // 3. Build rows
       const rows: Machine[] = predictions.map((p, i) => {
-      const s = latest[machineIds[i]];
-      const label = p.task_B.health_label;
-      return {
-        id: p.machine_id,
-        status: label === "Critical" ? "critical" : label === "Warning" ? "warning" : "good",
-        healthScore: p.overall_health_score ?? healthScoreFromProb(p.task_B.probabilities),
-        failureProb: p.task_A.failure_probability,
-        willFail: p.task_A.will_fail_within_7days,
-        riskLevel: p.task_A.risk_level,
-        temperature: s.temperature,
-        vibration: s.vibration,
-        rpm: s.rpm,
-        lastTimestamp: new Date(s.timestamp).toLocaleDateString("id-ID"),
-        rulHours: p.task_C?.rul_hours ?? 168,                       
-        rulCapped: p.task_C?.rul_capped ?? false,                   
-        isAnomaly: p.anomaly?.is_anomaly ?? false,                  
-        anomalyScore: p.anomaly?.score ?? 0,                        
-      };
-    });
+        const s = latest[machineIds[i]];
+        const label = p.task_B.health_label;
+        return {
+          id: p.machine_id,
+          status: label === "Critical" ? "critical" : label === "Warning" ? "warning" : "good",
+          healthScore: p.overall_health_score ?? healthScoreFromProb(p.task_B.probabilities),
+          failureProb: p.task_A.failure_probability,
+          willFail: p.task_A.will_fail_within_7days,
+          riskLevel: p.task_A.risk_level,
+          temperature: s.temperature,
+          vibration: s.vibration,
+          rpm: s.rpm,
+          lastTimestamp: new Date(s.timestamp).toLocaleDateString("en-US"),
+          isAnomaly: p.anomaly?.is_anomaly ?? false,
+          anomalyScore: p.anomaly?.score ?? 0,
+        };
+      });
 
       setMachines(rows);
-      setLastUpdate(new Date().toLocaleTimeString("id-ID"));
+      setLastUpdate(new Date().toLocaleTimeString("en-US"));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Gagal fetch data");
+      setError(err instanceof Error ? err.message : "Failed to fetch data");
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  fetchMachines();
-}, [fetchMachines]);
+    fetchMachines();
+  }, [fetchMachines]);
 
   const filtered = machines.filter(m =>
     m.id.toLowerCase().includes(search.toLowerCase())
@@ -172,20 +163,19 @@ export default function MachinesPage() {
           <h1 className="text-lg font-medium text-white">Machines</h1>
           {lastUpdate ? (
             <p className="text-[12px] text-zinc-500 mt-0.5">
-              {machines.length} mesin · {criticalCount} critical · {warningCount} warning · {willFailCount} akan gagal 7 hari ·{" "}
+              {machines.length} machines · {criticalCount} critical · {warningCount} warning · {willFailCount} will fail in 7 days ·{" "}
               <button onClick={fetchMachines} className="text-zinc-400 hover:text-white underline underline-offset-2 transition-colors">
                 Refresh
               </button>
             </p>
           ) : (
-            <p className="text-[12px] text-zinc-500 mt-0.5">Memuat data...</p>
+            <p className="text-[12px] text-zinc-500 mt-0.5">Loading data...</p>
           )}
         </div>
 
-        {/* Search */}
         <input
           type="text"
-          placeholder="Cari mesin..."
+          placeholder="Search machines..."
           value={search}
           onChange={e => setSearch(e.target.value)}
           className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[12px] text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-white/20 w-40"
@@ -197,7 +187,7 @@ export default function MachinesPage() {
         <div className="mb-4 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 flex items-center justify-between">
           <p className="text-[12px] text-red-400">{error}</p>
           <button onClick={fetchMachines} className="text-[11px] text-red-400 border border-red-500/30 px-3 py-1.5 rounded-lg hover:bg-red-500/10">
-            Coba Lagi
+            Try Again
           </button>
         </div>
       )}
@@ -205,10 +195,10 @@ export default function MachinesPage() {
       {/* Stats */}
       <div className="grid grid-cols-4 gap-3 mb-5">
         {[
-          { label: "Total Mesin",     value: machines.length, color: "text-white"    },
-          { label: "Critical",        value: criticalCount,   color: "text-red-400"  },
-          { label: "Warning",         value: warningCount,    color: "text-amber-400"},
-          { label: "Akan Gagal 7 Hari", value: willFailCount, color: "text-red-400" },
+          { label: "Total Machines",       value: machines.length, color: "text-white"     },
+          { label: "Critical",             value: criticalCount,   color: "text-red-400"   },
+          { label: "Warning",              value: warningCount,    color: "text-amber-400" },
+          { label: "Will Fail in 7 Days",  value: willFailCount,   color: "text-red-400"   },
         ].map(s => (
           <div key={s.label} className="bg-[#18191c] border border-white/5 rounded-xl p-4">
             <p className="text-[11px] text-zinc-500 mb-1">{s.label}</p>
@@ -224,7 +214,7 @@ export default function MachinesPage() {
         <table className="w-full">
           <thead>
             <tr className="border-b border-white/5">
-              {["ID","Status","Health Score","Failure Prob","Risk","RUL","Anomaly","Temp (°C)","Vibration","RPM","Data Terakhir"].map(h => (
+              {["ID","Status","Health Score","Failure Prob","Risk","Anomaly","Temp (°C)","Vibration","RPM","Last Data"].map(h => (
                 <th key={h} className="text-left text-[11px] font-medium text-zinc-500 px-4 py-3">{h}</th>
               ))}
             </tr>
@@ -233,7 +223,7 @@ export default function MachinesPage() {
             {loading ? (
               Array.from({length: 8}).map((_, i) => (
                 <tr key={i} className="border-b border-white/5">
-                  {Array.from({length: 11}).map((_, j) => (
+                  {Array.from({length: 10}).map((_, j) => (
                     <td key={j} className="px-4 py-3"><Skeleton className="h-4 w-full"/></td>
                   ))}
                 </tr>
@@ -285,19 +275,7 @@ export default function MachinesPage() {
                   }`}>{m.riskLevel}</span>
                 </td>
 
-                {/* RUL */}                                                    {/* ⭐ NEW */}
-                <td className="px-4 py-3">
-                  <span className={`text-[12px] ${
-                    m.rulHours < 24 ? "text-red-500" :
-                    m.rulHours < 72 ? "text-red-400" :
-                    m.rulHours < 168 ? "text-amber-400" :
-                    "text-green-400"
-                  }`}>
-                    {m.rulHours}j{m.rulCapped ? " (max)" : ""}
-                  </span>
-                </td>
-
-                {/* Anomaly */}                                                {/* ⭐ NEW */}
+                {/* Anomaly */}
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1.5">
                     <span className={`text-[12px] ${m.isAnomaly ? "text-purple-400" : "text-zinc-500"}`}>
@@ -329,7 +307,7 @@ export default function MachinesPage() {
 
         {!loading && filtered.length === 0 && (
           <div className="py-8 text-center text-[12px] text-zinc-500">
-            Tidak ada mesin ditemukan
+            No machines found
           </div>
         )}
       </div>

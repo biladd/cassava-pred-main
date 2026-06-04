@@ -49,9 +49,9 @@ function formatDate(iso: string) {
   const d = new Date(iso);
   const now = new Date();
   const days = Math.floor((now.getTime() - d.getTime()) / 86400000);
-  if (days === 0) return "Hari ini";
-  if (days === 1) return "Kemarin";
-  if (days < 7)  return `${days} hari lalu`;
+  if (days === 0) return "today";
+  if (days === 1) return "Yesterday";
+  if (days < 7)  return `${days} last day`;
   return d.toLocaleDateString("id-ID", { day: "numeric", month: "short" });
 }
 
@@ -385,12 +385,12 @@ PANDUAN MENJAWAB:
       {/* ── History Sidebar ─────────────────────────────────────────── */}
       <div className={`${sidebarOpen ? "w-56" : "w-0"} transition-all duration-200 overflow-hidden shrink-0 border-r border-white/5 bg-[#111214] flex flex-col`}>
         <div className="p-3 border-b border-white/5 flex items-center justify-between shrink-0">
-          <span className="text-[11px] font-medium text-zinc-500 tracking-wider">RIWAYAT CHAT</span>
+          <span className="text-[11px] font-medium text-zinc-500 tracking-wider">CHAT HISTORY</span>
           <button
             onClick={newChat}
             className="text-[10px] bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white px-2 py-1 rounded-md transition-colors"
           >
-            + Baru
+            + New
           </button>
         </div>
 
@@ -445,10 +445,7 @@ PANDUAN MENJAWAB:
               {sidebarOpen ? "◀" : "▶"}
             </button>
             <div>
-              <h1 className="text-lg font-medium text-white">AI Assistant</h1>
-              <p className="text-[12px] text-zinc-500 mt-0.5">
-                Tanya apapun tentang kondisi mesin & biaya maintenance — Llama 3.3
-              </p>
+              <h1 className="text-lg font-medium text-white">AI Assistant — Llama 3.3</h1>
             </div>
           </div>
 
@@ -465,7 +462,7 @@ PANDUAN MENJAWAB:
                     {warningMachines.length} Warning
                   </span>
                 )}
-                <span className="text-[11px] text-zinc-500">{machineContext.length} mesin</span>
+                <span className="text-[11px] text-zinc-500">{machineContext.length} machines</span>
               </>
             )}
           </div>
@@ -474,7 +471,8 @@ PANDUAN MENJAWAB:
         {/* Suggested questions */}
         {messages.length === 0 && !loadingContext && (
           <div className="mb-4 shrink-0">
-            <p className="text-[11px] text-zinc-600 mb-2">Contoh pertanyaan:</p>
+            <p className="text-[11px] text-zinc-600 mb-2">example questions
+</p>
             <div className="flex flex-wrap gap-2">
               {suggestedQuestions.map(q => (
                 <button
@@ -501,9 +499,6 @@ PANDUAN MENJAWAB:
             <div className="flex flex-col items-center justify-center h-full text-center">
               <div className="text-4xl mb-3">🤖</div>
               <p className="text-[14px] text-zinc-400 font-medium mb-1">AI Maintenance Assistant</p>
-              <p className="text-[12px] text-zinc-600">
-                Data {machineContext.length} mesin & cost analysis sudah dimuat. Silakan tanya!
-              </p>
             </div>
           ) : (
             messages.map((m, i) => (
@@ -548,7 +543,7 @@ PANDUAN MENJAWAB:
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Tanya tentang kondisi mesin atau biaya maintenance..."
+              placeholder="ask something..."
               rows={1}
               disabled={loading || loadingContext}
               className="flex-1 bg-transparent text-[13px] text-white placeholder-zinc-600 outline-none resize-none px-2 py-1.5 max-h-32"
@@ -558,12 +553,9 @@ PANDUAN MENJAWAB:
               disabled={loading || loadingContext || !input.trim()}
               className="bg-green-500 hover:bg-green-400 disabled:bg-white/10 disabled:text-zinc-600 text-white px-4 py-2 rounded-xl text-[12px] font-medium transition-colors shrink-0"
             >
-              {loading ? "..." : "Kirim"}
+              {loading ? "..." : "Send"}
             </button>
           </div>
-          <p className="text-[10px] text-zinc-700 text-center mt-2">
-            Shift+Enter untuk baris baru · Enter untuk kirim
-          </p>
         </div>
       </div>
     </div>

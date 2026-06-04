@@ -79,7 +79,7 @@ function SensorChart({ data }: { data: SensorTrend[] }) {
 
   if (data.length === 0) return (
     <div className="h-40 flex items-center justify-center">
-      <p className="text-[11px] text-zinc-600">Tidak ada data sensor</p>
+      <p className="text-[11px] text-zinc-600">No sensor data</p>
     </div>
   );
 
@@ -115,14 +115,12 @@ function SensorChart({ data }: { data: SensorTrend[] }) {
   );
 }
 
-
 function formatRUL(rulHours: number): string {
   if (rulHours >= 999) return "> 7.0d";
   if (rulHours >= 168) return "7.0d";
   if (rulHours >= 24) return `${(rulHours / 24).toFixed(1)}d`;
-  return `${Math.round(rulHours)}j`;
+  return `${Math.round(rulHours)}h`;
 }
-
 
 function Skeleton({ className }: { className?: string }) {
   return <div className={`animate-pulse bg-white/5 rounded ${className}`}/>;
@@ -140,7 +138,7 @@ export default function DashboardPage() {
     try {
       setError(null);
 
-      // 1. Ambil data sensor terbaru dari Supabase
+      // 1. Fetch latest sensor data from Supabase
       const { data: sensorData, error: sErr } = await supabase
         .from("sensor_readings")
         .select("*")
@@ -149,7 +147,7 @@ export default function DashboardPage() {
 
       if (sErr) throw new Error(`Supabase: ${sErr.message}`);
 
-      // Ambil 1 data terbaru per mesin
+      // Get the latest data per machine
       const latestPerMachine: Record<string, SensorRow> = {};
       for (const row of (sensorData ?? [])) {
         if (!latestPerMachine[row.machine_id]) {
@@ -159,7 +157,7 @@ export default function DashboardPage() {
 
       const machineIds = Object.keys(latestPerMachine).sort();
 
-      // 2. Kirim ke FastAPI
+      // 2. Send to FastAPI
       const predictions = await Promise.all(
         machineIds.map((id) => {
           const s = latestPerMachine[id];
@@ -184,7 +182,7 @@ export default function DashboardPage() {
         })
       );
 
-      // 3. Simpan prediksi ke Supabase (nonaktif dulu)
+      // 3. Save predictions to Supabase (disabled for now)
       // await supabase.from("predictions").insert(
       //   predictions.map(p => ({
       //     machine_id: p.machine_id,
@@ -216,33 +214,33 @@ export default function DashboardPage() {
 
       setMachines(rows.sort((a, b) => a.healthScore - b.healthScore));
 
-      // 5. Sensor trend untuk mesin yang dipilih
+      // 5. Sensor trend for selected machine
       const machineData = (sensorData ?? [])
         .filter(r => r.machine_id === selectedMachine)
         .slice(0, 24)
         .reverse();
 
       setSensorTrend(machineData.map(r => ({
-        label: new Date(r.timestamp).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
+        label: new Date(r.timestamp).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
         temperature: r.temperature,
         vibration: r.vibration,
         noise_level: r.noise_level,
       })));
 
-      setLastUpdate(new Date().toLocaleTimeString("id-ID"));
+      setLastUpdate(new Date().toLocaleTimeString("en-US"));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Gagal fetch data");
+      setError(err instanceof Error ? err.message : "Failed to fetch data");
     } finally {
       setLoading(false);
     }
   }, [selectedMachine]);
 
-useEffect(() => {
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  fetchAll();
-  const interval = setInterval(fetchAll, 60_000);
-  return () => clearInterval(interval);
-}, [fetchAll]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchAll();
+    const interval = setInterval(fetchAll, 60_000);
+    return () => clearInterval(interval);
+  }, [fetchAll]);
 
   const criticalCount = machines.filter(m => m.status === "critical").length;
   const willFailCount = machines.filter(m => m.willFail).length;
@@ -259,7 +257,7 @@ useEffect(() => {
           <h1 className="text-lg font-medium text-white">Predictive Maintenance Dashboard</h1>
           {lastUpdate && (
             <p className="text-[11px] text-zinc-500 mt-0.5">
-              Data real dari Supabase · Update: {lastUpdate} ·{" "}
+              Real data from Supabase · Updated: {lastUpdate} ·{" "}
               <button onClick={fetchAll} className="text-zinc-400 hover:text-white transition-colors underline underline-offset-2">
                 Refresh
               </button>
@@ -269,11 +267,11 @@ useEffect(() => {
         {loading ? <Skeleton className="w-24 h-7"/> :
           alerts.length > 0 ? (
             <span className="bg-amber-400 text-amber-900 text-[11px] font-semibold px-3 py-1.5 rounded-full">
-              {alerts.length} alert aktif
+              {alerts.length} active alerts
             </span>
           ) : (
             <span className="bg-green-500/20 text-green-400 text-[11px] font-semibold px-3 py-1.5 rounded-full border border-green-500/30">
-              Semua normal
+              All normal
             </span>
           )
         }
@@ -283,11 +281,11 @@ useEffect(() => {
       {error && (
         <div className="mb-4 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 flex items-center justify-between">
           <div>
-            <p className="text-[12px] text-red-400 font-medium">Gagal terhubung</p>
+            <p className="text-[12px] text-red-400 font-medium">Connection failed</p>
             <p className="text-[11px] text-red-400/70 mt-0.5">{error}</p>
           </div>
           <button onClick={fetchAll} className="text-[11px] text-red-400 border border-red-500/30 px-3 py-1.5 rounded-lg hover:bg-red-500/10 transition-colors">
-            Coba Lagi
+            Try Again
           </button>
         </div>
       )}
@@ -297,41 +295,41 @@ useEffect(() => {
         {loading ? Array.from({length:4}).map((_,i) => <Skeleton key={i} className="h-24 rounded-xl"/>) : (
           <>
             <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
-              <p className="text-[11px] text-zinc-500 mb-1.5">Total Mesin</p>
+              <p className="text-[11px] text-zinc-500 mb-1.5">Total Machines</p>
               <p className="text-2xl font-medium text-white leading-none mb-1">{machines.length}</p>
-              <p className="text-[11px] text-green-400">Dari Supabase</p>
+              <p className="text-[11px] text-green-400">From Supabase</p>
             </div>
             <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
-              <p className="text-[11px] text-zinc-500 mb-1.5">Status Kritis</p>
+              <p className="text-[11px] text-zinc-500 mb-1.5">Critical Status</p>
               <p className={`text-2xl font-medium leading-none mb-1 ${criticalCount > 0 ? "text-red-400" : "text-white"}`}>{criticalCount}</p>
-              <p className="text-[11px] text-red-400">{criticalCount > 0 ? "Perlu maintenance" : "Tidak ada"}</p>
+              <p className="text-[11px] text-red-400">{criticalCount > 0 ? "Needs maintenance" : "None"}</p>
             </div>
             <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
               <p className="text-[11px] text-zinc-500 mb-1.5">Avg Health Score</p>
               <p className={`text-2xl font-medium leading-none mb-1 ${scoreColor(avgHealth)}`}>{avgHealth}%</p>
-              <p className="text-[11px] text-zinc-500">Dari model prediksi</p>
+              <p className="text-[11px] text-zinc-500">From prediction model</p>
             </div>
             <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
-              <p className="text-[11px] text-zinc-500 mb-1.5">Akan Gagal 7 Hari</p>
+              <p className="text-[11px] text-zinc-500 mb-1.5">Will Fail in 7 Days</p>
               <p className={`text-2xl font-medium leading-none mb-1 ${willFailCount > 0 ? "text-red-400" : "text-green-400"}`}>{willFailCount}</p>
-              <p className="text-[11px] text-zinc-500">{mostCritical ? `${mostCritical.id} paling kritis` : "-"}</p>
+              <p className="text-[11px] text-zinc-500">{mostCritical ? `${mostCritical.id} most critical` : "-"}</p>
             </div>
             <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
-            <p className="text-[11px] text-zinc-500 mb-1.5">Anomali Terdeteksi</p>
-            <p className={`text-2xl font-medium leading-none mb-1 ${machines.filter(m => m.isAnomaly).length > 0 ? "text-purple-400" : "text-white"}`}>
-              {machines.filter(m => m.isAnomaly).length}
-            </p>
-            <p className="text-[11px] text-zinc-500">IsolationForest</p>
-          </div>
+              <p className="text-[11px] text-zinc-500 mb-1.5">Anomalies Detected</p>
+              <p className={`text-2xl font-medium leading-none mb-1 ${machines.filter(m => m.isAnomaly).length > 0 ? "text-purple-400" : "text-white"}`}>
+                {machines.filter(m => m.isAnomaly).length}
+              </p>
+              <p className="text-[11px] text-zinc-500">IsolationForest</p>
+            </div>
           </>
         )}
       </div>
 
-        {/* Charts Row */}
+      {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-        {/* Card kiri: Health Score per Mesin */}
+        {/* Left card: Health Score per Machine */}
         <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
-          <p className="text-[13px] font-medium text-zinc-300 mb-4">Health Score per Mesin</p>
+          <p className="text-[13px] font-medium text-zinc-300 mb-4">Health Score per Machine</p>
           {loading ? (
             <div className="flex flex-col gap-3">
               {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-8"/>)}
@@ -347,12 +345,12 @@ useEffect(() => {
                     </span>
                     {m.willFail && (
                       <span className="text-[9px] bg-red-500/20 text-red-400 border border-red-500/30 px-1.5 py-0.5 rounded font-medium">
-                        GAGAL 7D
+                        FAIL 7D
                       </span>
                     )}
                     {m.isAnomaly && (
                       <span className="text-[9px] bg-purple-500/20 text-purple-400 border border-purple-500/30 px-1.5 py-0.5 rounded font-medium">
-                        ANOMALI
+                        ANOMALY
                       </span>
                     )}
                   </div>
@@ -405,7 +403,7 @@ useEffect(() => {
           )}
         </div>
 
-        {/* Card kanan: Sensor Trends */}
+        {/* Right card: Sensor Trends */}
         <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -413,7 +411,7 @@ useEffect(() => {
               <select
                 value={selectedMachine}
                 onChange={(e) => setSelectedMachine(e.target.value)}
-                  aria-label="Pilih mesin untuk melihat sensor trends"
+                aria-label="Select machine to view sensor trends"
                 className="bg-white/5 border border-white/10 rounded-md px-2 py-0.5 text-[11px] text-zinc-300 focus:outline-none focus:border-white/20 cursor-pointer hover:bg-white/10 transition-colors"
               >
                 {machines.map(m => (
@@ -423,7 +421,7 @@ useEffect(() => {
                 ))}
               </select>
             </div>
-            <span className="text-[10px] text-zinc-500">Data real Supabase</span>
+            <span className="text-[10px] text-zinc-500">Real Supabase data</span>
           </div>
           {loading ? <Skeleton className="h-40"/> : <SensorChart data={sensorTrend}/>}
           <div className="flex gap-4 mt-3">
@@ -440,15 +438,15 @@ useEffect(() => {
       {/* Alerts */}
       <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
         <div className="flex items-center justify-between mb-3">
-          <p className="text-[13px] font-medium text-zinc-300">Alerts dari Model Prediksi</p>
+          <p className="text-[13px] font-medium text-zinc-300">Alerts from Prediction Model</p>
           <span className="text-[10px] text-zinc-500">Real-time via FastAPI + Supabase</span>
         </div>
         {loading ? (
           <div className="flex flex-col gap-2">{Array.from({length:2}).map((_,i) => <Skeleton key={i} className="h-14"/>)}</div>
         ) : alerts.length === 0 ? (
           <div className="py-6 text-center">
-            <p className="text-[13px] text-green-400 font-medium">✅ Tidak ada alert</p>
-            <p className="text-[11px] text-zinc-500 mt-1">Semua mesin dalam kondisi normal</p>
+            <p className="text-[13px] text-green-400 font-medium">✅ No alerts</p>
+            <p className="text-[11px] text-zinc-500 mt-1">All machines are in normal condition</p>
           </div>
         ) : (
           alerts.map((m) => (

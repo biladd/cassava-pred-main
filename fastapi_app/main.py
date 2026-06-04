@@ -383,17 +383,17 @@ def predict_anomaly_from_vector(vec_83: np.ndarray) -> tuple:
 def _get_recommendation(will_fail: bool, health_label: str, proba: float,
                          is_anomaly: int = 0, rul_hours: float = 168) -> str:
     if will_fail and health_label == "Critical":
-        return "⛔ SEGERA lakukan maintenance darurat! Risiko kegagalan sangat tinggi."
+        return "⛔ IMMEDIATELY perform emergency maintenance! The risk of failure is very high.."
     elif will_fail and rul_hours < 48:
-        return f"🚨 Maintenance dalam {rul_hours:.0f} jam. Risiko gagal sangat dekat."
+        return f"🚨 Maintenance in {rul_hours:.0f} hour. The risk of failure is very close."
     elif will_fail:
-        return "⚠️ Jadwalkan maintenance dalam 7 hari ke depan."
+        return "⚠️ Schedule maintenance within the next 7 dayst."
     elif is_anomaly:
-        return "🔍 Pola sensor abnormal terdeteksi. Inspeksi lebih dalam disarankan."
+        return "🔍 Abnormal sensor pattern detected. Further inspection is recommended.."
     elif health_label == "Warning":
-        return "🔔 Pantau mesin lebih ketat. Pertimbangkan maintenance preventif."
+        return "🔔 Monitor machines more closely. Consider preventive maintenance.."
     else:
-        return "✅ Mesin dalam kondisi normal. Lanjutkan jadwal maintenance rutin."
+        return "✅ The machine is in normal condition. Continue with the routine maintenance schedule.."
 
 
 # ────────────────────────────────────────────────────────────────

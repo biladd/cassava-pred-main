@@ -30,7 +30,7 @@ export default function LoginPage() {
   return (
     <div className="bg-white rounded-2xl shadow-xl p-8">
       <h1 className="text-2xl font-bold text-slate-900 mb-1">Login</h1>
-      <p className="text-sm text-slate-500 mb-6">Masuk ke akun kamu</p>
+      <p className="text-sm text-slate-500 mb-6">Enter your account</p>
 
       {error && (
         <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
@@ -107,9 +107,9 @@ export default function LoginPage() {
       </form>
 
       <p className="text-sm text-center text-slate-600 mt-6">
-        Belum punya akun?{' '}
+        Don't have account?{' '}
         <Link href="/register" className="text-slate-900 font-semibold hover:underline">
-          Daftar di sini
+          register 
         </Link>
       </p>
     </div>

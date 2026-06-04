@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 type Severity = "CRITICAL" | "WARNING";
-type FilterType = "Semua" | "Kritis" | "Warning";
+type FilterType = "All" | "Critical" | "Warning";
 
 interface Alert {
   id: string;
@@ -21,7 +21,7 @@ interface Alert {
   healthScore: number;
 }
 
-// ── Nilai normal per mesin (dari dataset nyata, failure=0) ──────────────────
+// ── Normal sensor values per machine (from real dataset, failure=0) ──────────
 const NORMAL_SENSOR_VALUES: Record<string, {
   temperature: number;
   vibration: number;
@@ -74,15 +74,15 @@ function getCategory(sensor: Record<string, number>): string {
 
 function getMessage(severity: Severity, sensor: Record<string, number>, healthScore: number, prob: number): string {
   if (severity === "CRITICAL") {
-    if (sensor.temperature >= 85) return `Suhu operasional melebihi threshold ${sensor.temperature.toFixed(0)}°C.`;
-    if (sensor.vibration >= 1.0)  return `Health score turun drastis (${healthScore}%). Bearing aus, perlu penggantian segera.`;
-    if (sensor.pressure >= 110)   return `Pressure melebihi batas aman ${sensor.pressure.toFixed(0)} bar.`;
-    return `Risiko kegagalan tinggi. Failure probability ${(prob * 100).toFixed(1)}%.`;
+    if (sensor.temperature >= 85) return `Operating temperature exceeded threshold at ${sensor.temperature.toFixed(0)}°C.`;
+    if (sensor.vibration >= 1.0)  return `Health score dropped critically (${healthScore}%). Bearing worn out, immediate replacement required.`;
+    if (sensor.pressure >= 110)   return `Pressure exceeded safe limit at ${sensor.pressure.toFixed(0)} bar.`;
+    return `High failure risk. Failure probability ${(prob * 100).toFixed(1)}%.`;
   }
-  if (sensor.vibration >= 0.7)        return `Vibrasi melebihi batas normal. Monitor terus untuk 24 jam ke depan.`;
-  if (sensor.noise_level >= 75)       return `Tingkat kebisingan meningkat ${sensor.noise_level.toFixed(0)} dB dari baseline.`;
-  if (sensor.power_consumption >= 80) return `Konsumsi daya tidak stabil dalam 2 jam terakhir.`;
-  return `Health score ${healthScore}% — perlu perhatian dalam 24 jam.`;
+  if (sensor.vibration >= 0.7)        return `Vibration exceeded normal limit. Monitor continuously for the next 24 hours.`;
+  if (sensor.noise_level >= 75)       return `Noise level increased to ${sensor.noise_level.toFixed(0)} dB above baseline.`;
+  if (sensor.power_consumption >= 80) return `Unstable power consumption detected in the last 2 hours.`;
+  return `Health score ${healthScore}% — attention required within 24 hours.`;
 }
 
 function Skeleton({ className }: { className?: string }) {
@@ -116,7 +116,7 @@ export default function AlertsPage() {
   const [loading, setLoading]         = useState(true);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
   const [error, setError]             = useState<string | null>(null);
-  const [filter, setFilter]           = useState<FilterType>("Semua");
+  const [filter, setFilter]           = useState<FilterType>("All");
   const [page, setPage]               = useState(1);
   const [lastUpdate, setLastUpdate]   = useState("");
 
@@ -124,7 +124,7 @@ export default function AlertsPage() {
     try {
       setError(null);
 
-      // 1. Ambil sensor terbaru per mesin
+      // 1. Fetch latest sensor data per machine
       const { data: sensorData, error: sErr } = await supabase
         .from("sensor_readings")
         .select("*")
@@ -140,27 +140,33 @@ export default function AlertsPage() {
 
       const machineIds = Object.keys(latest).sort();
 
-      // 2. Ambil predictions yang is_resolved=true
-      //    Hanya dianggap resolved jika resolved_at LEBIH BARU dari sensor terbaru
-      //    Ini memastikan jika sensor diubah rusak lagi setelah resolve → alert muncul lagi
-      const { data: resolvedData } = await supabase
+      // 2. Fetch ALL predictions from DB:
+      //    - is_resolved=false → active alerts
+      //    - is_resolved=true  → resolved history
+      const { data: allPredictions } = await supabase
         .from("predictions")
-        .select("machine_id, resolved_at")
-        .eq("is_resolved", true);
+        .select("machine_id, is_resolved, resolved_at, health_label, health_score, failure_probability")
+        .order("created_at", { ascending: false });
 
-      // Map: machine_id → waktu resolved terakhir
-      const resolvedMap: Record<string, string> = {};
-      for (const r of (resolvedData ?? [])) {
-        const existing = resolvedMap[r.machine_id];
-        if (!existing || r.resolved_at > existing) {
-          resolvedMap[r.machine_id] = r.resolved_at;
+      // Map active: machine_id → latest active prediction
+      const activeMap: Record<string, any> = {};
+      // Map resolved: machine_id → latest resolved
+      const resolvedMap: Record<string, any> = {};
+
+      for (const p of (allPredictions ?? [])) {
+        if (!p.is_resolved && !activeMap[p.machine_id]) {
+          activeMap[p.machine_id] = p;
+        }
+        if (p.is_resolved && !resolvedMap[p.machine_id]) {
+          resolvedMap[p.machine_id] = p;
         }
       }
 
-      // 3. Prediksi dari FastAPI
+      // 3. Predictions from FastAPI for ALL machines
       const predictions = await Promise.all(
         machineIds.map(id => {
           const s = latest[id];
+          if (!s) return Promise.resolve(null);
           return fetch(`${API_URL}/predict`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -175,25 +181,21 @@ export default function AlertsPage() {
               humidity:          s.humidity,
               operating_hours:   s.operating_hours,
             }),
-          }).then(r => r.json());
+          }).then(r => r.json()).catch(() => null);
         })
       );
 
       // 4. Build alerts
       const newAlerts: Alert[] = [];
-      for (let i = 0; i < predictions.length; i++) {
-        const p         = predictions[i];
-        const mid       = machineIds[i];
-        const sensor    = latest[mid];
-        const label     = p.task_B.health_label;
-        const prob      = p.task_A.failure_probability;
-        const score     = healthScoreFromProb(p.task_B.probabilities);
-        const sensorTs  = new Date(sensor.timestamp).toISOString();
-        const resolvedAt = resolvedMap[mid];
+      for (let i = 0; i < machineIds.length; i++) {
+        const p      = predictions[i];
+        const mid    = machineIds[i];
+        const sensor = latest[mid];
+        if (!p || !sensor) continue;
 
-        // Cek apakah benar-benar resolved:
-        // resolved hanya berlaku jika waktu resolved LEBIH BARU dari sensor saat ini
-        const isResolved = !!resolvedAt && resolvedAt > sensorTs;
+        const label = p.task_B?.health_label;
+        const prob  = p.task_A?.failure_probability ?? 0;
+        const score = p.task_B?.probabilities ? healthScoreFromProb(p.task_B.probabilities) : 0;
 
         if (label === "Critical" || label === "Warning") {
           const severity: Severity = label === "Critical" ? "CRITICAL" : "WARNING";
@@ -205,9 +207,8 @@ export default function AlertsPage() {
             power_consumption: sensor.power_consumption,
           };
 
-          // Hanya insert prediction baru jika belum resolved
-          let predId = `${mid}-${Date.now()}`;
-          if (!isResolved) {
+          // If no active prediction → insert new (including when broken again after resolved)
+          if (!activeMap[mid]) {
             const { data: inserted } = await supabase
               .from("predictions")
               .insert({
@@ -222,24 +223,47 @@ export default function AlertsPage() {
               })
               .select("id")
               .single();
-            if (inserted?.id) predId = inserted.id.toString();
+            if (inserted?.id) activeMap[mid] = { id: inserted.id };
           }
 
           newAlerts.push({
-            id:          predId,
+            id:          activeMap[mid]?.id?.toString() ?? `${mid}-${Date.now()}`,
             severity,
             machine:     mid,
             message:     getMessage(severity, sensorMap, score, prob),
             category:    getCategory(sensorMap),
-            time:        new Date(sensor.timestamp).toLocaleString("id-ID", {
+            time:        new Date(sensor.timestamp).toLocaleString("en-US", {
               day: "2-digit", month: "2-digit", year: "numeric",
               hour: "2-digit", minute: "2-digit",
             }),
-            resolved:    isResolved,
+            resolved:    false,
             failureProb: prob,
             healthScore: score,
           });
         }
+      }
+
+      // 5. Add resolved entries from DB for machines that are already healthy
+      //    (not shown in FastAPI loop since they are back to normal)
+      for (const mid of Object.keys(resolvedMap)) {
+        const alreadyExists = newAlerts.find(a => a.machine === mid);
+        if (alreadyExists) continue;
+
+        const r = resolvedMap[mid];
+        newAlerts.push({
+          id:          `${mid}-resolved-${r.resolved_at}`,
+          severity:    (r.health_label === "Critical" ? "CRITICAL" : "WARNING") as Severity,
+          machine:     mid,
+          message:     "Machine has been repaired and returned to normal.",
+          category:    "General",
+          time:        new Date(r.resolved_at).toLocaleString("en-US", {
+            day: "2-digit", month: "2-digit", year: "numeric",
+            hour: "2-digit", minute: "2-digit",
+          }),
+          resolved:    true,
+          failureProb: 0,
+          healthScore: 100,
+        });
       }
 
       newAlerts.sort((a, b) => {
@@ -249,9 +273,9 @@ export default function AlertsPage() {
       });
 
       setAlerts(newAlerts);
-      setLastUpdate(new Date().toLocaleTimeString("id-ID"));
+      setLastUpdate(new Date().toLocaleTimeString("en-US"));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Gagal fetch data");
+      setError(err instanceof Error ? err.message : "Failed to fetch data");
     } finally {
       setLoading(false);
     }
@@ -263,15 +287,15 @@ export default function AlertsPage() {
     return () => clearInterval(interval);
   }, [fetchAlerts]);
 
-  // ── Tandai Selesai ────────────────────────────────────────────────────────────
-  // 1. Update predictions → is_resolved: true
-  // 2. Insert sensor normal → mesin kembali sehat
-  // 3. Jika di-test rusak lagi via Supabase → karena sensor baru > resolved_at, alert muncul lagi
+  // ── Mark as Resolved ──────────────────────────────────────────────────────
+  // 1. Update predictions → is_resolved: true in DB
+  // 2. Update latest sensor → normal values
+  // 3. Update UI immediately without waiting for refresh
   async function resolveAlert(alertId: string, machineId: string) {
     try {
       setResolvingId(alertId);
 
-      // Step 1: Tandai semua predictions mesin ini sebagai resolved
+      // Step 1: Mark active predictions for this machine as resolved
       await supabase
         .from("predictions")
         .update({
@@ -281,43 +305,58 @@ export default function AlertsPage() {
         .eq("machine_id", machineId)
         .eq("is_resolved", false);
 
-      // Step 2: Insert sensor normal ke sensor_readings
+      // Step 2: Update latest sensor to normal values
       const normalValues = NORMAL_SENSOR_VALUES[machineId] ?? DEFAULT_NORMAL;
-      await supabase
+      const { data: latestSensor } = await supabase
         .from("sensor_readings")
-        .insert({
-          machine_id:        machineId,
-          timestamp:         new Date().toISOString(),
-          temperature:       normalValues.temperature,
-          vibration:         normalValues.vibration,
-          pressure:          normalValues.pressure,
-          rpm:               normalValues.rpm,
-          power_consumption: normalValues.power_consumption,
-          noise_level:       normalValues.noise_level,
-          humidity:          normalValues.humidity,
-          operating_hours:   0,
-          failure:           0,
-        });
+        .select("timestamp")
+        .eq("machine_id", machineId)
+        .order("timestamp", { ascending: false })
+        .limit(1)
+        .single();
 
-      // Step 3: Update UI langsung
+      if (latestSensor?.timestamp) {
+        await supabase
+          .from("sensor_readings")
+          .update({
+            temperature:       normalValues.temperature,
+            vibration:         normalValues.vibration,
+            pressure:          normalValues.pressure,
+            rpm:               normalValues.rpm,
+            power_consumption: normalValues.power_consumption,
+            noise_level:       normalValues.noise_level,
+            humidity:          normalValues.humidity,
+            failure:           0,
+          })
+          .eq("machine_id", machineId)
+          .eq("timestamp", latestSensor.timestamp);
+      }
+
+      // Step 3: Update UI immediately
       setAlerts(prev =>
-        prev.map(a => a.id === alertId ? { ...a, resolved: true } : a)
+        prev.map(a => a.id === alertId ? {
+          ...a,
+          resolved:    true,
+          message:     "Machine has been repaired and returned to normal.",
+          failureProb: 0,
+          healthScore: 100,
+        } : a)
       );
 
     } catch (err) {
-      console.error("Gagal resolve:", err);
+      console.error("Failed to resolve:", err);
     } finally {
       setResolvingId(null);
     }
   }
 
-  // ── Derived state ─────────────────────────────────────────────────────────────
+  // ── Derived state ─────────────────────────────────────────────────────────
   const activeAlerts   = alerts.filter(a => !a.resolved);
   const resolvedAlerts = alerts.filter(a => a.resolved);
 
   const filtered = activeAlerts.filter(a => {
-    if (filter === "Kritis")  return a.severity === "CRITICAL";
-    if (filter === "Warning") return a.severity === "WARNING";
+    if (filter === "Critical") return a.severity === "CRITICAL";
+    if (filter === "Warning")  return a.severity === "WARNING";
     return true;
   });
 
@@ -327,16 +366,16 @@ export default function AlertsPage() {
   const warningCount     = activeAlerts.filter(a => a.severity === "WARNING").length;
   const affectedMachines = new Set(activeAlerts.map(a => a.machine)).size;
 
-  // ── Render ────────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-lg font-medium text-white">Alert Aktif</h1>
+          <h1 className="text-lg font-medium text-white">Active Alerts</h1>
           <p className="text-[12px] text-zinc-500 mt-0.5">
-            {criticalCount} Kritis · {warningCount} Peringatan
-            {lastUpdate && ` · Update: ${lastUpdate}`} ·{" "}
+            {criticalCount} Critical · {warningCount} Warning
+            {lastUpdate && ` · Updated: ${lastUpdate}`} ·{" "}
             <button
               onClick={fetchAlerts}
               className="text-zinc-400 hover:text-white underline underline-offset-2 transition-colors"
@@ -349,7 +388,7 @@ export default function AlertsPage() {
           onClick={() => exportAlerts(alerts)}
           className="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-300 text-[12px] font-medium px-4 py-2 rounded-lg transition-colors"
         >
-          ↓ Export Laporan
+          ↓ Export Report
         </button>
       </div>
 
@@ -361,7 +400,7 @@ export default function AlertsPage() {
             onClick={fetchAlerts}
             className="text-[11px] text-red-400 border border-red-500/30 px-3 py-1.5 rounded-lg hover:bg-red-500/10"
           >
-            Coba Lagi
+            Try Again
           </button>
         </div>
       )}
@@ -390,7 +429,7 @@ export default function AlertsPage() {
 
       {/* Filter */}
       <div className="flex gap-2 mb-4">
-        {(["Semua", "Kritis", "Warning"] as FilterType[]).map(f => (
+        {(["All", "Critical", "Warning"] as FilterType[]).map(f => (
           <button
             key={f}
             onClick={() => { setFilter(f); setPage(1); }}
@@ -412,8 +451,8 @@ export default function AlertsPage() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="bg-[#18191c] border border-white/5 rounded-xl py-10 text-center mb-6">
-          <p className="text-[13px] text-green-400 font-medium">✅ Tidak ada alert aktif</p>
-          <p className="text-[11px] text-zinc-500 mt-1">Semua mesin dalam kondisi normal</p>
+          <p className="text-[13px] text-green-400 font-medium">✅ No active alerts</p>
+          <p className="text-[11px] text-zinc-500 mt-1">All machines are in normal condition</p>
         </div>
       ) : (
         <div className="flex flex-col gap-3 mb-4">
@@ -463,14 +502,14 @@ export default function AlertsPage() {
                     href={`/machines/${a.machine}`}
                     className="text-[11px] bg-green-500 hover:bg-green-400 text-white px-3 py-1.5 rounded-lg transition-colors font-medium"
                   >
-                    Lihat Mesin
+                    View Machine
                   </Link>
                   <button
                     onClick={() => resolveAlert(a.id, a.machine)}
                     disabled={resolvingId === a.id}
                     className="text-[11px] bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-400 hover:text-white px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
                   >
-                    {resolvingId === a.id ? "Menyimpan..." : "Tandai Selesai"}
+                    {resolvingId === a.id ? "Saving..." : "Mark as Resolved"}
                   </button>
                 </div>
               </div>

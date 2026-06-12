@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 
 const navItems = [
@@ -72,37 +72,50 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
   const [machines, setMachines] = useState<MachineStatus[]>([]);
 
-  useEffect(() => {
-    async function fetchMachineStatuses() {
-      // Fetch latest prediction per machine from Supabase
-      const { data } = await supabase
-        .from("predictions")
-        .select("machine_id, health_label, created_at")
-        .order("created_at", { ascending: false })
-        .limit(200);
+  const fetchMachineStatuses = useCallback(async () => {
+    const { data } = await supabase
+      .from("predictions")
+      .select("machine_id, health_label, created_at")
+      .order("created_at", { ascending: false })
+      .limit(2000);
 
-      if (!data) return;
+    if (!data) return;
 
-      // Get the latest prediction per machine
-      const latest: Record<string, string> = {};
-      for (const row of data) {
-        if (!latest[row.machine_id]) {
-          latest[row.machine_id] = row.health_label;
-        }
+    const latest: Record<string, string> = {};
+    for (const row of data) {
+      if (!latest[row.machine_id]) {
+        latest[row.machine_id] = row.health_label;
       }
-
-      const rows: MachineStatus[] = Object.entries(latest)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([id, label]) => ({
-          id,
-          status: label === "Critical" ? "critical" : label === "Warning" ? "warning" : "good",
-        }));
-
-      setMachines(rows);
     }
 
-    fetchMachineStatuses();
+    const rows: MachineStatus[] = Object.entries(latest)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([id, label]) => ({
+        id,
+        status: label === "Critical" ? "critical" : label === "Warning" ? "warning" : "good",
+      }));
+
+    setMachines(rows);
   }, []);
+
+  useEffect(() => {
+    fetchMachineStatuses();
+
+    const channel = supabase
+      .channel("predictions-changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "predictions" },
+        () => {
+          fetchMachineStatuses();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchMachineStatuses]);
 
   return (
     <div className="flex h-screen bg-[#111214] overflow-hidden">

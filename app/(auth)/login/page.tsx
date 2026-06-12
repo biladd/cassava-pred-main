@@ -50,7 +50,7 @@ export default function LoginPage() {
             value={email}
             onChange={e => setEmail(e.target.value)}
             className="w-full px-4 py-2.5 rounded-lg border-2 border-slate-300 focus:border-slate-800 focus:ring-2 focus:ring-slate-800/10 outline-none transition text-slate-900 text-sm placeholder:text-slate-400 bg-slate-50"
-            placeholder="kamu@email.com"
+            placeholder="you@email.com"
             disabled={loading}
           />
         </div>

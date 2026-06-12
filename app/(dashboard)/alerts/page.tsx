@@ -140,17 +140,13 @@ export default function AlertsPage() {
 
       const machineIds = Object.keys(latest).sort();
 
-      // 2. Fetch ALL predictions from DB:
-      //    - is_resolved=false → active alerts
-      //    - is_resolved=true  → resolved history
+      // 2. Fetch ALL predictions from DB
       const { data: allPredictions } = await supabase
         .from("predictions")
         .select("machine_id, is_resolved, resolved_at, health_label, health_score, failure_probability")
         .order("created_at", { ascending: false });
 
-      // Map active: machine_id → latest active prediction
       const activeMap: Record<string, any> = {};
-      // Map resolved: machine_id → latest resolved
       const resolvedMap: Record<string, any> = {};
 
       for (const p of (allPredictions ?? [])) {
@@ -207,7 +203,6 @@ export default function AlertsPage() {
             power_consumption: sensor.power_consumption,
           };
 
-          // If no active prediction → insert new (including when broken again after resolved)
           if (!activeMap[mid]) {
             const { data: inserted } = await supabase
               .from("predictions")
@@ -243,8 +238,7 @@ export default function AlertsPage() {
         }
       }
 
-      // 5. Add resolved entries from DB for machines that are already healthy
-      //    (not shown in FastAPI loop since they are back to normal)
+      // 5. Add resolved entries from DB
       for (const mid of Object.keys(resolvedMap)) {
         const alreadyExists = newAlerts.find(a => a.machine === mid);
         if (alreadyExists) continue;
@@ -288,14 +282,11 @@ export default function AlertsPage() {
   }, [fetchAlerts]);
 
   // ── Mark as Resolved ──────────────────────────────────────────────────────
-  // 1. Update predictions → is_resolved: true in DB
-  // 2. Update latest sensor → normal values
-  // 3. Update UI immediately without waiting for refresh
   async function resolveAlert(alertId: string, machineId: string) {
     try {
       setResolvingId(alertId);
 
-      // Step 1: Mark active predictions for this machine as resolved
+      // Step 1: Mark active predictions as resolved
       await supabase
         .from("predictions")
         .update({
@@ -305,7 +296,7 @@ export default function AlertsPage() {
         .eq("machine_id", machineId)
         .eq("is_resolved", false);
 
-      // Step 2: Update latest sensor to normal values
+      // Step 2: Reset sensor to normal values
       const normalValues = NORMAL_SENSOR_VALUES[machineId] ?? DEFAULT_NORMAL;
       const { data: latestSensor } = await supabase
         .from("sensor_readings")
@@ -332,14 +323,45 @@ export default function AlertsPage() {
           .eq("timestamp", latestSensor.timestamp);
       }
 
-      // Step 3: Update UI immediately
+      // Step 3: Kirim sensor normal ke FastAPI untuk dapat hasil model
+      const prediction = await fetch(`${API_URL}/predict/full`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          machine_id:        machineId,
+          temperature:       normalValues.temperature,
+          vibration:         normalValues.vibration,
+          pressure:          normalValues.pressure,
+          rpm:               normalValues.rpm,
+          power_consumption: normalValues.power_consumption,
+          noise_level:       normalValues.noise_level,
+          humidity:          normalValues.humidity,
+          operating_hours:   0,
+        }),
+      }).then(r => r.json());
+
+      // Step 4: Insert prediction baru dari hasil FastAPI
+      await supabase
+        .from("predictions")
+        .insert({
+          machine_id:          machineId,
+          health_label:        prediction.task_B.health_label,
+          health_score:        prediction.overall_health_score,
+          failure_probability: prediction.task_A.failure_probability,
+          will_fail:           prediction.task_A.will_fail_within_7days,
+          risk_level:          prediction.task_A.risk_level,
+          recommendation:      prediction.recommendation,
+          is_resolved:         false,
+        });
+
+      // Step 5: Update UI immediately
       setAlerts(prev =>
         prev.map(a => a.id === alertId ? {
           ...a,
           resolved:    true,
           message:     "Machine has been repaired and returned to normal.",
-          failureProb: 0,
-          healthScore: 100,
+          failureProb: prediction.task_A.failure_probability,
+          healthScore: prediction.overall_health_score,
         } : a)
       );
 
@@ -500,14 +522,14 @@ export default function AlertsPage() {
                 <div className="flex items-center gap-2 ml-4 shrink-0">
                   <Link
                     href={`/machines/${a.machine}`}
-                    className="text-[11px] bg-green-500 hover:bg-green-400 text-white px-3 py-1.5 rounded-lg transition-colors font-medium"
+                    className="text-[11px] bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-400 hover:text-white px-3 py-1.5 rounded-lg transition-colors"
                   >
                     View Machine
                   </Link>
                   <button
                     onClick={() => resolveAlert(a.id, a.machine)}
                     disabled={resolvingId === a.id}
-                    className="text-[11px] bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-400 hover:text-white px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                    className="text-[11px] bg-green-500 hover:bg-green-400 text-white font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
                   >
                     {resolvingId === a.id ? "Saving..." : "Mark as Resolved"}
                   </button>

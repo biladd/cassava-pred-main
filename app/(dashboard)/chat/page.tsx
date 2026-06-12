@@ -83,7 +83,7 @@ export default function ChatPage() {
     });
   }, []);
 
-  // ── Fetch machine + cost context ──────────────────────────────────────
+  // ── next js ngambil data ke supabase buat AI ──────────────────────────────────────
   useEffect(() => {
     async function fetchContext() {
       // Sensor readings
@@ -370,12 +370,12 @@ PANDUAN MENJAWAB:
   const warningMachines  = machineContext.filter(m => m.health_label === "Warning");
 
   const suggestedQuestions = [
-    "Mesin mana yang paling berisiko gagal?",
-    "Mesin mana yang biaya maintenance-nya tertinggi?",
-    "Berapa total ROI dari predictive maintenance?",
-    "Mesin mana yang perlu segera ditangani?",
-    "Berapa total downtime semua mesin?",
-    "Mesin mana yang paling aman dioperasikan?",
+    "Which machines are most at risk of failure?",
+    "Which machine has the highest maintenance costs?",
+    "What is the total ROI of predictive maintenance?",
+    "Which machines need immediate attention?",
+    "What is the total downtime of all machines?",
+    "Which machine is the safest to operate?",
   ];
 
   // ── Render ─────────────────────────────────────────────────────────────

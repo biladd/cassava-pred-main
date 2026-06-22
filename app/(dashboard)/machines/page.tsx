@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 
-const API_URL = process.env.NEXT_PUBLIC_RAILWAY_URL ?? "http://localhost:8000";
+const API_URL = (process.env.NEXT_PUBLIC_RAILWAY_URL ?? "http://localhost:8000").replace(/\/$/, "");
 
 type MachineStatus = "critical" | "warning" | "good";
 
@@ -111,12 +111,15 @@ export default function MachinesPage() {
               humidity: s.humidity,
               operating_hours: s.operating_hours,
             }),
-          }).then(r => r.json());
+          }).then(r => {
+            if (!r.ok) throw new Error(`FastAPI error ${r.status}`);
+            return r.json();
+          }).catch(() => null);
         })
       );
 
-      const rows: Machine[] = predictions.map((p, i) => {
-        const s = latest[machineIds[i]];
+      const rows: Machine[] = predictions.filter(p => p !== null).map((p, i) => {
+        const s = latest[p.machine_id] ?? latest[machineIds[i]];
         const label = p.task_B.health_label;
         return {
           id: p.machine_id,

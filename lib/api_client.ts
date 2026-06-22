@@ -1,6 +1,6 @@
 // lib/api.ts — Wrapper untuk FastAPI backend
 
-const API_URL = process.env.NEXT_PUBLIC_RAILWAY_URL || "http://localhost:8000";
+const API_URL = (process.env.NEXT_PUBLIC_RAILWAY_URL || "http://localhost:8000").replace(/\/$/, "");
 
 // ────────────────────────────────────────────────────────────────
 // Types

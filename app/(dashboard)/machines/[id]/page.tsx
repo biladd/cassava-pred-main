@@ -4,7 +4,7 @@ import Link from "next/link";
 import { use, useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 
-const API_URL = process.env.NEXT_PUBLIC_RAILWAY_URL ?? "http://localhost:8000";
+const API_URL = (process.env.NEXT_PUBLIC_RAILWAY_URL ?? "http://localhost:8000").replace(/\/$/, "");
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface SensorTrend {

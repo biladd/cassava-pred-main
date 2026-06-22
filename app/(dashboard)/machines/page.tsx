@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 
-const API_URL = process.env.RAILWAY_URL ?? "http://localhost:8000";
+const API_URL = process.env.NEXT_PUBLIC_RAILWAY_URL ?? "http://localhost:8000";
 
 type MachineStatus = "critical" | "warning" | "good";
 

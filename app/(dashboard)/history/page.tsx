@@ -32,7 +32,7 @@ function TypeBadge({ type }: { type: RecordType }) {
 }
 
 function Skeleton({ className }: { className?: string }) {
-  return <div className={`animate-pulse bg-white/5 rounded ${className}`}/>;
+  return <div className={`animate-pulse bg-surface-hover rounded ${className}`}/>;
 }
 
 // ── Export CSV ─────────────────────────────────────────────────────────────
@@ -73,8 +73,8 @@ function MonthlyChart({ records }: { records: HistoryRecord[] }) {
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
       {[0, Math.round(maxVal/2), maxVal].map(v => (
         <g key={v}>
-          <line x1={padL} y1={H - padB - (v/maxVal)*(H-padB-8)} x2={W} y2={H - padB - (v/maxVal)*(H-padB-8)} stroke="#ffffff08" strokeWidth="0.5"/>
-          <text x={padL-2} y={H - padB - (v/maxVal)*(H-padB-8) + 3} textAnchor="end" fill="#555" fontSize="7">{v}</text>
+          <line x1={padL} y1={H - padB - (v/maxVal)*(H-padB-8)} x2={W} y2={H - padB - (v/maxVal)*(H-padB-8)} stroke="var(--border-color)" strokeWidth="0.5"/>
+          <text x={padL-2} y={H - padB - (v/maxVal)*(H-padB-8) + 3} textAnchor="end" fill="var(--text-tertiary)" fontSize="7">{v}</text>
         </g>
       ))}
       {months.map(([month, v], i) => {
@@ -89,8 +89,8 @@ function MonthlyChart({ records }: { records: HistoryRecord[] }) {
             <rect x={x} y={base - hP}      width={barW} height={hP} fill="#22c55e" rx="2"/>
             <rect x={x} y={base - hP - hC} width={barW} height={hC} fill="#f59e0b" rx="2"/>
             <rect x={x} y={base - hP - hC - hE} width={barW} height={hE} fill="#ef4444" rx="2"/>
-            <text x={x + barW/2} y={H - 6} textAnchor="middle" fill="#555" fontSize="8">{month}</text>
-            {total > 0 && <text x={x + barW/2} y={base - hP - hC - hE - 3} textAnchor="middle" fill="#888" fontSize="7">{total}</text>}
+            <text x={x + barW/2} y={H - 6} textAnchor="middle" fill="var(--text-tertiary)" fontSize="8">{month}</text>
+            {total > 0 && <text x={x + barW/2} y={base - hP - hC - hE - 3} textAnchor="middle" fill="var(--text-secondary)" fontSize="7">{total}</text>}
           </g>
         );
       })}
@@ -118,7 +118,7 @@ function DonutChart({ emergency, corrective, preventive }: { emergency: number; 
 
   return (
     <svg viewBox="0 0 120 120" className="w-32">
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#ffffff08" strokeWidth="16"/>
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--border-color)" strokeWidth="16"/>
       {pE > 0 && <circle cx={cx} cy={cy} r={r} fill="none" stroke="#ef4444" strokeWidth="16"
         strokeDasharray={`${dE} ${circumference - dE}`} strokeDashoffset={offsetE}
         transform={`rotate(-90 ${cx} ${cy})`}/>}
@@ -128,7 +128,7 @@ function DonutChart({ emergency, corrective, preventive }: { emergency: number; 
       {pP > 0 && <circle cx={cx} cy={cy} r={r} fill="none" stroke="#22c55e" strokeWidth="16"
         strokeDasharray={`${dP} ${circumference - dP}`} strokeDashoffset={offsetP}
         transform={`rotate(-90 ${cx} ${cy})`}/>}
-      <text x={cx} y={cy+4} textAnchor="middle" fill="#fff" fontSize="14" fontWeight="500">{total}</text>
+      <text x={cx} y={cy+4} textAnchor="middle" fill="var(--text-primary)" fontSize="14" fontWeight="500">{total}</text>
     </svg>
   );
 }
@@ -200,12 +200,12 @@ export default function HistoryPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-lg font-medium text-white">Maintenance History</h1>
-          <p className="text-[12px] text-zinc-500 mt-0.5">Real data from Supabase</p>
+          <h1 className="text-lg font-medium text-text-primary">Maintenance History</h1>
+          <p className="text-[12px] text-text-secondary mt-0.5">Real data from Supabase</p>
         </div>
         <button
           onClick={() => exportToCSV(filtered)}
-          className="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-300 text-[12px] font-medium px-4 py-2 rounded-lg transition-colors"
+          className="flex items-center gap-2 bg-surface-hover hover:bg-surface-hover border border-border-color text-text-secondary text-[12px] font-medium px-4 py-2 rounded-lg transition-colors"
         >
           <span>↓</span> Export Data
         </button>
@@ -222,25 +222,25 @@ export default function HistoryPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
         {loading ? Array.from({length:4}).map((_,i) => <Skeleton key={i} className="h-24 rounded-xl"/>) : (
           <>
-            <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
-              <p className="text-[11px] text-zinc-500 mb-1">Total Maintenance</p>
-              <p className="text-2xl font-medium text-white">{records.length}</p>
-              <p className="text-[11px] text-zinc-600">All activities</p>
+            <div className="bg-surface border border-border-color rounded-xl p-4">
+              <p className="text-[11px] text-text-secondary mb-1">Total Maintenance</p>
+              <p className="text-2xl font-medium text-text-primary">{records.length}</p>
+              <p className="text-[11px] text-text-tertiary">All activities</p>
             </div>
-            <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
-              <p className="text-[11px] text-zinc-500 mb-1">Total Downtime</p>
-              <p className="text-2xl font-medium text-white">{totalDowntime.toFixed(0)} hrs</p>
-              <p className="text-[11px] text-zinc-600">Accumulated across all machines</p>
+            <div className="bg-surface border border-border-color rounded-xl p-4">
+              <p className="text-[11px] text-text-secondary mb-1">Total Downtime</p>
+              <p className="text-2xl font-medium text-text-primary">{totalDowntime.toFixed(0)} hrs</p>
+              <p className="text-[11px] text-text-tertiary">Accumulated across all machines</p>
             </div>
-            <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
-              <p className="text-[11px] text-zinc-500 mb-1">Total Cost</p>
-              <p className="text-2xl font-medium text-white">{fmt(totalCost)}</p>
-              <p className="text-[11px] text-zinc-600">All maintenance types</p>
+            <div className="bg-surface border border-border-color rounded-xl p-4">
+              <p className="text-[11px] text-text-secondary mb-1">Total Cost</p>
+              <p className="text-2xl font-medium text-text-primary">{fmt(totalCost)}</p>
+              <p className="text-[11px] text-text-tertiary">All maintenance types</p>
             </div>
-            <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
-              <p className="text-[11px] text-zinc-500 mb-1">Emergency Rate</p>
+            <div className="bg-surface border border-border-color rounded-xl p-4">
+              <p className="text-[11px] text-text-secondary mb-1">Emergency Rate</p>
               <p className={`text-2xl font-medium ${emergencyRate > 20 ? "text-red-400" : "text-amber-400"}`}>{emergencyRate}%</p>
-              <p className="text-[11px] text-zinc-600">{emergencyCount} out of {records.length} total</p>
+              <p className="text-[11px] text-text-tertiary">{emergencyCount} out of {records.length} total</p>
             </div>
           </>
         )}
@@ -249,12 +249,12 @@ export default function HistoryPage() {
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
         {/* Monthly trend */}
-        <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
-          <p className="text-[13px] font-medium text-zinc-300 mb-4">Monthly Maintenance Trend</p>
+        <div className="bg-surface border border-border-color rounded-xl p-4">
+          <p className="text-[13px] font-medium text-text-secondary mb-4">Monthly Maintenance Trend</p>
           {loading ? <Skeleton className="h-36"/> : <MonthlyChart records={records}/>}
           <div className="flex gap-4 mt-2">
             {[{label:"Emergency",color:"bg-red-500"},{label:"Corrective",color:"bg-amber-400"},{label:"Preventive",color:"bg-green-500"}].map(s => (
-              <span key={s.label} className="flex items-center gap-1.5 text-[10px] text-zinc-500">
+              <span key={s.label} className="flex items-center gap-1.5 text-[10px] text-text-secondary">
                 <span className={`w-2 h-2 rounded-sm ${s.color}`}/>
                 {s.label}
               </span>
@@ -263,8 +263,8 @@ export default function HistoryPage() {
         </div>
 
         {/* Donut */}
-        <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
-          <p className="text-[13px] font-medium text-zinc-300 mb-4">Maintenance Types</p>
+        <div className="bg-surface border border-border-color rounded-xl p-4">
+          <p className="text-[13px] font-medium text-text-secondary mb-4">Maintenance Types</p>
           {loading ? <Skeleton className="h-36"/> : (
             <div className="flex items-center gap-6">
               <DonutChart emergency={emergencyCount} corrective={correctiveCount} preventive={preventiveCount}/>
@@ -276,7 +276,7 @@ export default function HistoryPage() {
                 ].map(s => (
                   <div key={s.label} className="flex items-center gap-2">
                     <span className={`w-2.5 h-2.5 rounded-full ${s.dot}`}/>
-                    <span className="text-[12px] text-zinc-400">{s.label}</span>
+                    <span className="text-[12px] text-text-secondary">{s.label}</span>
                     <span className={`text-[12px] font-medium ml-auto ${s.color}`}>{s.count}</span>
                   </div>
                 ))}
@@ -287,17 +287,17 @@ export default function HistoryPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-[#18191c] border border-white/5 rounded-xl overflow-hidden">
+      <div className="bg-surface border border-border-color rounded-xl overflow-hidden">
         {/* Filter bar */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
-          <p className="text-[13px] font-medium text-zinc-300">All Records</p>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border-color">
+          <p className="text-[13px] font-medium text-text-secondary">All Records</p>
           <div className="flex items-center gap-2">
             {/* Filter type */}
             <div className="flex gap-1">
               {(["all","Emergency","Corrective","Preventive"] as const).map(t => (
                 <button key={t} onClick={() => { setFilterType(t); setPage(1); }}
                   className={`text-[10px] px-2 py-1 rounded transition-colors ${
-                    filterType === t ? "bg-white/15 text-white" : "text-zinc-500 hover:text-zinc-300"
+                    filterType === t ? "bg-sidebar-active-bg text-sidebar-active-text" : "text-text-secondary hover:text-text-primary"
                   }`}>
                   {t === "all" ? "All" : t}
                 </button>
@@ -309,48 +309,48 @@ export default function HistoryPage() {
               placeholder="Search..."
               value={search}
               onChange={e => { setSearch(e.target.value); setPage(1); }}
-              className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-[11px] text-zinc-300 placeholder-zinc-600 focus:outline-none w-32"
+              className="bg-surface-hover border border-border-color rounded-lg px-3 py-1.5 text-[11px] text-text-primary placeholder-text-tertiary focus:outline-none w-32"
             />
           </div>
         </div>
 
         <table className="w-full">
           <thead>
-            <tr className="border-b border-white/5">
+            <tr className="border-b border-border-color">
               {["Date", "Machine", "Type", "Downtime", "Cost", "Notes", "Technician"].map(h => (
-                <th key={h} className="text-left text-[11px] font-medium text-zinc-500 px-4 py-3">{h}</th>
+                <th key={h} className="text-left text-[11px] font-medium text-text-secondary px-4 py-3">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {loading ? Array.from({length:8}).map((_,i) => (
-              <tr key={i} className="border-b border-white/5">
+              <tr key={i} className="border-b border-border-color">
                 {Array.from({length:7}).map((_,j) => (
                   <td key={j} className="px-4 py-3"><Skeleton className="h-4"/></td>
                 ))}
               </tr>
             )) : paginated.map(r => (
-              <tr key={r.id} className="border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors">
-                <td className="px-4 py-3 text-[12px] text-zinc-400">{r.date}</td>
+              <tr key={r.id} className="border-b border-border-color last:border-0 hover:bg-surface-hover transition-colors">
+                <td className="px-4 py-3 text-[12px] text-text-secondary">{r.date}</td>
                 <td className="px-4 py-3 text-[12px] font-medium text-blue-400">{r.machine}</td>
                 <td className="px-4 py-3"><TypeBadge type={r.type}/></td>
-                <td className="px-4 py-3 text-[12px] text-zinc-400">{r.downtime.toFixed(1)} hrs</td>
-                <td className="px-4 py-3 text-[12px] text-zinc-400">{fmt(r.cost)}</td>
-                <td className="px-4 py-3 text-[12px] text-zinc-500 max-w-[200px] truncate">{r.note}</td>
-                <td className="px-4 py-3 text-[12px] text-zinc-500">{r.technician}</td>
+                <td className="px-4 py-3 text-[12px] text-text-secondary">{r.downtime.toFixed(1)} hrs</td>
+                <td className="px-4 py-3 text-[12px] text-text-secondary">{fmt(r.cost)}</td>
+                <td className="px-4 py-3 text-[12px] text-text-tertiary max-w-[200px] truncate">{r.note}</td>
+                <td className="px-4 py-3 text-[12px] text-text-tertiary">{r.technician}</td>
               </tr>
             ))}
           </tbody>
           {!loading && (
             <tfoot>
-              <tr className="border-t border-white/10">
-                <td colSpan={3} className="px-4 py-3 text-[12px] font-medium text-zinc-400">
+              <tr className="border-t border-border-color">
+                <td colSpan={3} className="px-4 py-3 text-[12px] font-medium text-text-secondary">
                   Total ({filtered.length} records)
                 </td>
-                <td className="px-4 py-3 text-[12px] text-zinc-400">
+                <td className="px-4 py-3 text-[12px] text-text-secondary">
                   {filtered.reduce((a,r) => a + r.downtime, 0).toFixed(1)} hrs
                 </td>
-                <td className="px-4 py-3 text-[12px] font-medium text-white">
+                <td className="px-4 py-3 text-[12px] font-medium text-text-primary">
                   {fmt(filtered.reduce((a,r) => a + r.cost, 0))}
                 </td>
                 <td colSpan={2}/>
@@ -361,14 +361,14 @@ export default function HistoryPage() {
 
         {/* Pagination */}
         {!loading && totalPages > 1 && (
-          <div className="flex items-center justify-center gap-1.5 px-4 py-3 border-t border-white/5">
+          <div className="flex items-center justify-center gap-1.5 px-4 py-3 border-t border-border-color">
             {/* First + Prev */}
             <button onClick={() => setPage(1)} disabled={page === 1}
-              className="text-[11px] text-zinc-400 hover:text-white disabled:opacity-30 px-2 py-1.5 rounded border border-white/10 transition-colors">
+              className="text-[11px] text-text-secondary hover:text-text-primary disabled:opacity-30 px-2 py-1.5 rounded border border-border-color transition-colors">
               «
             </button>
             <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-              className="text-[11px] text-zinc-400 hover:text-white disabled:opacity-30 px-3 py-1.5 rounded border border-white/10 transition-colors">
+              className="text-[11px] text-text-secondary hover:text-text-primary disabled:opacity-30 px-3 py-1.5 rounded border border-border-color transition-colors">
               Previous
             </button>
 
@@ -389,13 +389,13 @@ export default function HistoryPage() {
 
               return pages.map((p, i) =>
                 p === "..." ? (
-                  <span key={`ellipsis-${i}`} className="text-[11px] text-zinc-600 px-1">…</span>
+                  <span key={`ellipsis-${i}`} className="text-[11px] text-text-tertiary px-1">…</span>
                 ) : (
                   <button key={p} onClick={() => setPage(p)}
                     className={`text-[11px] px-3 py-1.5 rounded border transition-colors ${
                       page === p
-                        ? "bg-white/15 text-white border-white/20"
-                        : "text-zinc-400 hover:text-white border-white/10"
+                        ? "bg-sidebar-active-bg text-sidebar-active-text border-border-color"
+                        : "text-text-secondary hover:text-text-primary border-border-color"
                     }`}>
                     {p}
                   </button>
@@ -405,23 +405,23 @@ export default function HistoryPage() {
 
             {/* Next + Last */}
             <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-              className="text-[11px] text-zinc-400 hover:text-white disabled:opacity-30 px-3 py-1.5 rounded border border-white/10 transition-colors">
+              className="text-[11px] text-text-secondary hover:text-text-primary disabled:opacity-30 px-3 py-1.5 rounded border border-border-color transition-colors">
               Next
             </button>
             <button onClick={() => setPage(totalPages)} disabled={page === totalPages}
-              className="text-[11px] text-zinc-400 hover:text-white disabled:opacity-30 px-2 py-1.5 rounded border border-white/10 transition-colors">
+              className="text-[11px] text-text-secondary hover:text-text-primary disabled:opacity-30 px-2 py-1.5 rounded border border-border-color transition-colors">
               »
             </button>
 
             {/* Page info */}
-            <span className="text-[11px] text-zinc-600 ml-2">
+            <span className="text-[11px] text-text-tertiary ml-2">
               Page {page} of {totalPages}
             </span>
           </div>
         )}
 
         {!loading && filtered.length === 0 && (
-          <div className="py-8 text-center text-[12px] text-zinc-500">No records found</div>
+          <div className="py-8 text-center text-[12px] text-text-secondary">No records found</div>
         )}
       </div>
     </div>

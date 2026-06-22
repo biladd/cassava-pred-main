@@ -42,7 +42,7 @@ interface CostContext {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function Skeleton({ className }: { className?: string }) {
-  return <div className={`animate-pulse bg-white/5 rounded ${className}`} />;
+  return <div className={`animate-pulse bg-surface-hover rounded ${className}`} />;
 }
 
 function formatDate(iso: string) {
@@ -383,12 +383,12 @@ PANDUAN MENJAWAB:
     <div className="flex h-screen overflow-hidden">
 
       {/* ── History Sidebar ─────────────────────────────────────────── */}
-      <div className={`${sidebarOpen ? "w-56" : "w-0"} transition-all duration-200 overflow-hidden shrink-0 border-r border-white/5 bg-[#111214] flex flex-col`}>
-        <div className="p-3 border-b border-white/5 flex items-center justify-between shrink-0">
-          <span className="text-[11px] font-medium text-zinc-500 tracking-wider">CHAT HISTORY</span>
+      <div className={`${sidebarOpen ? "w-56" : "w-0"} transition-all duration-200 overflow-hidden shrink-0 border-r border-border-color bg-sidebar-bg flex flex-col`}>
+        <div className="p-3 border-b border-border-color flex items-center justify-between shrink-0">
+          <span className="text-[11px] font-medium text-text-tertiary tracking-wider">CHAT HISTORY</span>
           <button
             onClick={newChat}
-            className="text-[10px] bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white px-2 py-1 rounded-md transition-colors"
+            className="text-[10px] bg-surface-hover hover:bg-surface-hover border border-border-color text-text-secondary hover:text-text-primary px-2 py-1 rounded-md transition-colors"
           >
             + New
           </button>
@@ -400,7 +400,7 @@ PANDUAN MENJAWAB:
               <Skeleton key={i} className="h-10 rounded-lg mb-1" />
             ))
           ) : sessions.length === 0 ? (
-            <p className="text-[11px] text-zinc-600 text-center mt-6 px-3">
+            <p className="text-[11px] text-text-tertiary text-center mt-6 px-3">
               Belum ada riwayat chat
             </p>
           ) : (
@@ -410,17 +410,17 @@ PANDUAN MENJAWAB:
                 onClick={() => loadSession(s.id)}
                 className={`group flex items-start justify-between gap-1 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
                   activeSessionId === s.id
-                    ? "bg-white/10 text-white"
-                    : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5"
+                    ? "bg-sidebar-active-bg text-sidebar-active-text"
+                    : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
                 }`}
               >
                 <div className="flex-1 min-w-0">
                   <p className="text-[11px] font-medium truncate leading-tight">{s.title}</p>
-                  <p className="text-[10px] text-zinc-600 mt-0.5">{formatDate(s.created_at)}</p>
+                  <p className="text-[10px] text-text-tertiary mt-0.5">{formatDate(s.created_at)}</p>
                 </div>
                 <button
                   onClick={e => deleteSession(e, s.id)}
-                  className="opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-red-400 transition-all text-[12px] mt-0.5 shrink-0"
+                  className="opacity-0 group-hover:opacity-100 text-text-tertiary hover:text-red-400 transition-all text-[12px] mt-0.5 shrink-0"
                   title="Hapus"
                 >
                   ✕
@@ -439,13 +439,13 @@ PANDUAN MENJAWAB:
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSidebarOpen(v => !v)}
-              className="text-zinc-500 hover:text-white transition-colors text-[14px] p-1 rounded-md hover:bg-white/5"
+              className="text-text-secondary hover:text-text-primary transition-colors text-[14px] p-1 rounded-md hover:bg-surface-hover"
               title="Toggle history"
             >
               {sidebarOpen ? "◀" : "▶"}
             </button>
             <div>
-              <h1 className="text-lg font-medium text-white">AI Assistant — Llama 3.3</h1>
+              <h1 className="text-lg font-medium text-text-primary">AI Assistant — Llama 3.3</h1>
             </div>
           </div>
 
@@ -462,7 +462,7 @@ PANDUAN MENJAWAB:
                     {warningMachines.length} Warning
                   </span>
                 )}
-                <span className="text-[11px] text-zinc-500">{machineContext.length} machines</span>
+                <span className="text-[11px] text-text-secondary">{machineContext.length} machines</span>
               </>
             )}
           </div>
@@ -471,14 +471,14 @@ PANDUAN MENJAWAB:
         {/* Suggested questions */}
         {messages.length === 0 && !loadingContext && (
           <div className="mb-4 shrink-0">
-            <p className="text-[11px] text-zinc-600 mb-2">example questions
+            <p className="text-[11px] text-text-tertiary mb-2">example questions
 </p>
             <div className="flex flex-wrap gap-2">
               {suggestedQuestions.map(q => (
                 <button
                   key={q}
                   onClick={() => setInput(q)}
-                  className="text-[11px] bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-400 hover:text-white px-3 py-1.5 rounded-lg transition-colors"
+                  className="text-[11px] bg-surface-hover hover:bg-surface-hover border border-border-color text-text-secondary hover:text-text-primary px-3 py-1.5 rounded-lg transition-colors"
                 >
                   {q}
                 </button>
@@ -498,18 +498,18 @@ PANDUAN MENJAWAB:
           ) : messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center">
               <div className="text-4xl mb-3">🤖</div>
-              <p className="text-[14px] text-zinc-400 font-medium mb-1">AI Maintenance Assistant</p>
+              <p className="text-[14px] text-text-secondary font-medium mb-1">AI Maintenance Assistant</p>
             </div>
           ) : (
             messages.map((m, i) => (
               <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${
                   m.role === "user"
-                    ? "bg-white/10 text-white rounded-br-sm"
-                    : "bg-[#18191c] border border-white/5 text-zinc-300 rounded-bl-sm"
+                    ? "bg-sidebar-active-bg text-sidebar-active-text rounded-br-sm"
+                    : "bg-surface border border-border-color text-text-secondary rounded-bl-sm"
                 }`}>
                   {m.role === "assistant" && (
-                    <p className="text-[10px] text-zinc-500 mb-1.5 font-medium">🤖 AI Assistant</p>
+                    <p className="text-[10px] text-text-tertiary mb-1.5 font-medium">🤖 AI Assistant</p>
                   )}
                   <p className="text-[13px] leading-relaxed whitespace-pre-wrap">{m.content}</p>
                 </div>
@@ -519,13 +519,13 @@ PANDUAN MENJAWAB:
 
           {loading && (
             <div className="flex justify-start">
-              <div className="bg-[#18191c] border border-white/5 rounded-2xl rounded-bl-sm px-4 py-3">
-                <p className="text-[10px] text-zinc-500 mb-1.5 font-medium">🤖 AI Assistant</p>
+              <div className="bg-surface border border-border-color rounded-2xl rounded-bl-sm px-4 py-3">
+                <p className="text-[10px] text-text-tertiary mb-1.5 font-medium">🤖 AI Assistant</p>
                 <div className="flex gap-1">
                   {[0, 1, 2].map(i => (
                     <div
                       key={i}
-                      className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce"
+                      className="w-1.5 h-1.5 bg-text-tertiary rounded-full animate-bounce"
                       style={{ animationDelay: `${i * 0.15}s` }}
                     />
                   ))}
@@ -538,7 +538,7 @@ PANDUAN MENJAWAB:
 
         {/* Input */}
         <div className="shrink-0 pb-6">
-          <div className="flex gap-2 bg-[#18191c] border border-white/10 rounded-2xl p-2">
+          <div className="flex gap-2 bg-surface border border-border-color rounded-2xl p-2">
             <textarea
               value={input}
               onChange={e => setInput(e.target.value)}
@@ -546,12 +546,12 @@ PANDUAN MENJAWAB:
               placeholder="ask something..."
               rows={1}
               disabled={loading || loadingContext}
-              className="flex-1 bg-transparent text-[13px] text-white placeholder-zinc-600 outline-none resize-none px-2 py-1.5 max-h-32"
+              className="flex-1 bg-transparent text-[13px] text-text-primary placeholder-text-tertiary outline-none resize-none px-2 py-1.5 max-h-32"
             />
             <button
               onClick={sendMessage}
               disabled={loading || loadingContext || !input.trim()}
-              className="bg-green-500 hover:bg-green-400 disabled:bg-white/10 disabled:text-zinc-600 text-white px-4 py-2 rounded-xl text-[12px] font-medium transition-colors shrink-0"
+              className="bg-green-500 hover:bg-green-400 disabled:bg-surface-hover disabled:text-text-tertiary text-white px-4 py-2 rounded-xl text-[12px] font-medium transition-colors shrink-0"
             >
               {loading ? "..." : "Send"}
             </button>

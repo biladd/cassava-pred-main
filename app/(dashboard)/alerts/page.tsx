@@ -86,7 +86,7 @@ function getMessage(severity: Severity, sensor: Record<string, number>, healthSc
 }
 
 function Skeleton({ className }: { className?: string }) {
-  return <div className={`animate-pulse bg-white/5 rounded ${className}`} />;
+  return <div className={`animate-pulse bg-surface-hover rounded ${className}`} />;
 }
 
 function exportAlerts(alerts: Alert[]) {
@@ -394,13 +394,13 @@ export default function AlertsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-lg font-medium text-white">Active Alerts</h1>
-          <p className="text-[12px] text-zinc-500 mt-0.5">
+          <h1 className="text-lg font-medium text-text-primary">Active Alerts</h1>
+          <p className="text-[12px] text-text-secondary mt-0.5">
             {criticalCount} Critical · {warningCount} Warning
             {lastUpdate && ` · Updated: ${lastUpdate}`} ·{" "}
             <button
               onClick={fetchAlerts}
-              className="text-zinc-400 hover:text-white underline underline-offset-2 transition-colors"
+              className="text-text-secondary hover:text-text-primary underline underline-offset-2 transition-colors"
             >
               Refresh
             </button>
@@ -408,7 +408,7 @@ export default function AlertsPage() {
         </div>
         <button
           onClick={() => exportAlerts(alerts)}
-          className="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-300 text-[12px] font-medium px-4 py-2 rounded-lg transition-colors"
+          className="flex items-center gap-2 bg-surface-hover hover:bg-surface-hover border border-border-color text-text-secondary text-[12px] font-medium px-4 py-2 rounded-lg transition-colors"
         >
           ↓ Export Report
         </button>
@@ -433,17 +433,17 @@ export default function AlertsPage() {
           Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-xl" />)
         ) : (
           <>
-            <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
-              <p className="text-[11px] text-zinc-500 mb-1">Critical Alerts</p>
+            <div className="bg-surface border border-border-color rounded-xl p-4">
+              <p className="text-[11px] text-text-secondary mb-1">Critical Alerts</p>
               <p className="text-2xl font-medium text-red-400">{criticalCount}</p>
             </div>
-            <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
-              <p className="text-[11px] text-zinc-500 mb-1">Warning Alerts</p>
+            <div className="bg-surface border border-border-color rounded-xl p-4">
+              <p className="text-[11px] text-text-secondary mb-1">Warning Alerts</p>
               <p className="text-2xl font-medium text-amber-400">{warningCount}</p>
             </div>
-            <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
-              <p className="text-[11px] text-zinc-500 mb-1">Machines Affected</p>
-              <p className="text-2xl font-medium text-white">{affectedMachines}</p>
+            <div className="bg-surface border border-border-color rounded-xl p-4">
+              <p className="text-[11px] text-text-secondary mb-1">Machines Affected</p>
+              <p className="text-2xl font-medium text-text-primary">{affectedMachines}</p>
             </div>
           </>
         )}
@@ -457,8 +457,8 @@ export default function AlertsPage() {
             onClick={() => { setFilter(f); setPage(1); }}
             className={`text-[12px] px-4 py-1.5 rounded-full transition-colors ${
               filter === f
-                ? "bg-white/15 text-white"
-                : "text-zinc-500 hover:text-zinc-300 bg-white/5"
+                ? "bg-sidebar-active-bg text-sidebar-active-text"
+                : "text-text-secondary hover:text-text-primary bg-surface-hover"
             }`}
           >
             {f}
@@ -472,19 +472,19 @@ export default function AlertsPage() {
           {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="bg-[#18191c] border border-white/5 rounded-xl py-10 text-center mb-6">
+        <div className="bg-surface border border-border-color rounded-xl py-10 text-center mb-6">
           <p className="text-[13px] text-green-400 font-medium">✅ No active alerts</p>
-          <p className="text-[11px] text-zinc-500 mt-1">All machines are in normal condition</p>
+          <p className="text-[11px] text-text-secondary mt-1">All machines are in normal condition</p>
         </div>
       ) : (
         <div className="flex flex-col gap-3 mb-4">
           {paginated.map(a => (
             <div
               key={a.id}
-              className={`bg-[#18191c] border rounded-xl p-4 border-l-2 ${
+              className={`bg-surface border rounded-xl p-4 border-l-2 ${
                 a.severity === "CRITICAL"
-                  ? "border-l-red-500 border-white/5"
-                  : "border-l-amber-400 border-white/5"
+                  ? "border-l-red-500 border-border-color"
+                  : "border-l-amber-400 border-border-color"
               }`}
             >
               <div className="flex items-start justify-between">
@@ -497,11 +497,11 @@ export default function AlertsPage() {
                     }`}>
                       {a.severity}
                     </span>
-                    <span className="text-[12px] font-medium text-zinc-300">{a.machine}</span>
-                    <span className="text-[11px] text-zinc-600">{a.time}</span>
+                    <span className="text-[12px] font-medium text-text-primary">{a.machine}</span>
+                    <span className="text-[11px] text-text-tertiary">{a.time}</span>
                   </div>
-                  <p className="text-[13px] text-zinc-200 mb-1">{a.message}</p>
-                  <p className="text-[11px] text-zinc-500">
+                  <p className="text-[13px] text-text-primary mb-1">{a.message}</p>
+                  <p className="text-[11px] text-text-secondary">
                     Category: {a.category} ·
                     Failure prob:{" "}
                     <span className={a.failureProb >= 0.5 ? "text-red-400" : "text-amber-400"}>
@@ -522,7 +522,7 @@ export default function AlertsPage() {
                 <div className="flex items-center gap-2 ml-4 shrink-0">
                   <Link
                     href={`/machines/${a.machine}`}
-                    className="text-[11px] bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-400 hover:text-white px-3 py-1.5 rounded-lg transition-colors"
+                    className="text-[11px] bg-surface-hover hover:bg-surface-hover border border-border-color text-text-secondary hover:text-text-primary px-3 py-1.5 rounded-lg transition-colors"
                   >
                     View Machine
                   </Link>
@@ -546,7 +546,7 @@ export default function AlertsPage() {
           <button
             onClick={() => setPage(p => Math.max(1, p - 1))}
             disabled={page === 1}
-            className="text-[11px] text-zinc-400 hover:text-white disabled:opacity-30 px-3 py-1.5 rounded border border-white/10 transition-colors"
+            className="text-[11px] text-text-secondary hover:text-text-primary disabled:opacity-30 px-3 py-1.5 rounded border border-border-color transition-colors"
           >
             Previous
           </button>
@@ -556,8 +556,8 @@ export default function AlertsPage() {
               onClick={() => setPage(i + 1)}
               className={`text-[11px] px-3 py-1.5 rounded border transition-colors ${
                 page === i + 1
-                  ? "bg-white/15 text-white border-white/20"
-                  : "text-zinc-400 hover:text-white border-white/10"
+                  ? "bg-sidebar-active-bg text-sidebar-active-text border-border-color"
+                  : "text-text-secondary hover:text-text-primary border-border-color"
               }`}
             >
               {i + 1}
@@ -566,7 +566,7 @@ export default function AlertsPage() {
           <button
             onClick={() => setPage(p => Math.min(totalPages, p + 1))}
             disabled={page === totalPages}
-            className="text-[11px] text-zinc-400 hover:text-white disabled:opacity-30 px-3 py-1.5 rounded border border-white/10 transition-colors"
+            className="text-[11px] text-text-secondary hover:text-text-primary disabled:opacity-30 px-3 py-1.5 rounded border border-border-color transition-colors"
           >
             Next
           </button>
@@ -576,13 +576,13 @@ export default function AlertsPage() {
       {/* Resolved */}
       {resolvedAlerts.length > 0 && (
         <>
-          <p className="text-[10px] font-medium tracking-widest text-zinc-600 mb-3">RESOLVED</p>
-          <div className="bg-[#18191c] border border-white/5 rounded-xl overflow-hidden opacity-60">
+          <p className="text-[10px] font-medium tracking-widest text-text-tertiary mb-3">RESOLVED</p>
+          <div className="bg-surface border border-border-color rounded-xl overflow-hidden opacity-60">
             {resolvedAlerts.map((a, i) => (
               <div
                 key={a.id}
                 className={`flex items-start justify-between px-4 py-4 ${
-                  i < resolvedAlerts.length - 1 ? "border-b border-white/5" : ""
+                  i < resolvedAlerts.length - 1 ? "border-b border-border-color" : ""
                 }`}
               >
                 <div className="flex items-start gap-3">
@@ -598,15 +598,15 @@ export default function AlertsPage() {
                       }`}>
                         {a.severity}
                       </span>
-                      <span className="text-[11px] text-zinc-400">{a.machine}</span>
+                      <span className="text-[11px] text-text-secondary">{a.machine}</span>
                       <span className="text-[10px] text-green-400 border border-green-500/30 px-1.5 py-0.5 rounded">
                         Resolved ✓
                       </span>
                     </div>
-                    <p className="text-[12px] text-zinc-500">{a.message}</p>
+                    <p className="text-[12px] text-text-secondary">{a.message}</p>
                   </div>
                 </div>
-                <span className="text-[11px] text-zinc-600 whitespace-nowrap ml-4 pt-0.5">
+                <span className="text-[11px] text-text-tertiary whitespace-nowrap ml-4 pt-0.5">
                   {a.time}
                 </span>
               </div>

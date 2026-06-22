@@ -111,13 +111,25 @@ function Gauge({ score }: { score: number }) {
   const x2 = cx + r * Math.cos(endAngle),   y2 = cy + r * Math.sin(endAngle);
   const px = cx + r * Math.cos(angle),       py = cy + r * Math.sin(angle);
   const color = score < 40 ? "#e24b4a" : score < 70 ? "#ef9f27" : "#63aa22";
+
+  // FIX: large-arc-flag berdasarkan derajat arc yang digambar, bukan score > 50
+  // Total arc = 270°. Large arc flag = 1 jika arc > 180° → saat score > 66.7
+  const arcDeg = (score / 100) * 270;
+  const largeArc = arcDeg > 180 ? 1 : 0;
+
   return (
     <svg viewBox="0 0 160 120" className="w-36">
-      <path d={`M${x1.toFixed(1)},${y1.toFixed(1)} A${r},${r} 0 1 1 ${x2.toFixed(1)},${y2.toFixed(1)}`}
-        fill="none" stroke="#ffffff10" strokeWidth="8" strokeLinecap="round"/>
-      <path d={`M${x1.toFixed(1)},${y1.toFixed(1)} A${r},${r} 0 ${score > 50 ? 1 : 0} 1 ${px.toFixed(1)},${py.toFixed(1)}`}
-        fill="none" stroke={color} strokeWidth="8" strokeLinecap="round"/>
-      <text x={cx} y={cy + 8} textAnchor="middle" fill={color} fontSize="22" fontWeight="500">{score}%</text>
+      <path
+        d={`M${x1.toFixed(1)},${y1.toFixed(1)} A${r},${r} 0 1 1 ${x2.toFixed(1)},${y2.toFixed(1)}`}
+        fill="none" stroke="var(--border-color)" strokeWidth="8" strokeLinecap="round"
+      />
+      <path
+        d={`M${x1.toFixed(1)},${y1.toFixed(1)} A${r},${r} 0 ${largeArc} 1 ${px.toFixed(1)},${py.toFixed(1)}`}
+        fill="none" stroke={color} strokeWidth="8" strokeLinecap="round"
+      />
+      <text x={cx} y={cy + 8} textAnchor="middle" fill={color} fontSize="22" fontWeight="500">
+        {score}%
+      </text>
     </svg>
   );
 }
@@ -129,7 +141,7 @@ function SensorChart({ data }: { data: SensorTrend[] }) {
 
   if (data.length === 0) return (
     <div className="h-40 flex items-center justify-center">
-      <p className="text-[11px] text-zinc-600">No sensor data available</p>
+      <p className="text-[11px] text-text-tertiary">No sensor data available</p>
     </div>
   );
 
@@ -148,13 +160,13 @@ function SensorChart({ data }: { data: SensorTrend[] }) {
         const v = minV + range * t;
         return (
           <g key={i}>
-            <line x1={padL} y1={toY(v)} x2={W - padR} y2={toY(v)} stroke="#ffffff10" strokeWidth="0.5"/>
-            <text x={padL - 4} y={toY(v) + 3.5} textAnchor="end" fill="#555" fontSize="7">{v.toFixed(0)}</text>
+            <line x1={padL} y1={toY(v)} x2={W - padR} y2={toY(v)} stroke="var(--border-color)" strokeWidth="0.5"/>
+            <text x={padL - 4} y={toY(v) + 3.5} textAnchor="end" fill="var(--text-tertiary)" fontSize="7">{v.toFixed(0)}</text>
           </g>
         );
       })}
       {data.filter((_, i) => i % step === 0).map((d, i) => (
-        <text key={i} x={toX(i * step)} y={H - 6} textAnchor="middle" fill="#555" fontSize="7">{d.label}</text>
+        <text key={i} x={toX(i * step)} y={H - 6} textAnchor="middle" fill="var(--text-tertiary)" fontSize="7">{d.label}</text>
       ))}
       <path d={makePath(data.map(d => d.temperature))} fill="none" stroke="#e24b4a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
       <path d={makePath(data.map(d => d.vibration * 100))} fill="none" stroke="#ef9f27" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="4 2"/>
@@ -181,7 +193,7 @@ function formatRUL(rulHours: number): string {
 }
 
 function Skeleton({ className }: { className?: string }) {
-  return <div className={`animate-pulse bg-white/5 rounded ${className}`}/>;
+  return <div className={`animate-pulse bg-surface-hover rounded ${className}`}/>;
 }
 
 // ── Page ───────────────────────────────────────────────────────────────────
@@ -407,12 +419,12 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
     <div className="p-6 max-w-[1400px] mx-auto space-y-5">
 
       {/* Breadcrumb */}
-      <div className="flex items-center gap-1.5 text-[11px] text-zinc-600">
-        <Link href="/" className="hover:text-zinc-400 transition-colors">Dashboard</Link>
+      <div className="flex items-center gap-1.5 text-[11px] text-text-tertiary">
+        <Link href="/" className="hover:text-text-secondary transition-colors">Dashboard</Link>
         <span>/</span>
-        <Link href="/machines" className="hover:text-zinc-400 transition-colors">Machines</Link>
+        <Link href="/machines" className="hover:text-text-secondary transition-colors">Machines</Link>
         <span>/</span>
-        <span className="text-zinc-300 font-medium">{id}</span>
+        <span className="text-text-primary font-medium">{id}</span>
       </div>
 
       {/* Will-Fail Alert Banner */}
@@ -431,7 +443,7 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
         <div className="flex items-start justify-between">
           <div>
             <div className="flex items-center gap-3 mb-1">
-              <h1 className="text-xl font-semibold text-white">Machine {id}</h1>
+              <h1 className="text-xl font-semibold text-text-primary">Machine {id}</h1>
               <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${statusColor(machine.status)}`}>
                 {machine.status.toUpperCase()}
               </span>
@@ -441,14 +453,14 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
                 </span>
               )}
             </div>
-            <p className="text-[11px] text-zinc-500">
-              Updated <span className="text-zinc-400">{machine.lastTimestamp}</span>
-              {" · "}Last maintenance <span className="text-zinc-400">{machine.lastMaintenance}</span>
+            <p className="text-[11px] text-text-secondary">
+              Updated <span className="text-text-secondary">{machine.lastTimestamp}</span>
+              {" · "}Last maintenance <span className="text-text-secondary">{machine.lastMaintenance}</span>
             </p>
           </div>
           <button
             onClick={fetchDetail}
-            className="text-[11px] text-zinc-400 hover:text-white border border-white/10 hover:border-white/20 px-3 py-1.5 rounded-lg transition-colors"
+            className="text-[11px] text-text-secondary hover:text-text-primary border border-border-color hover:border-text-tertiary px-3 py-1.5 rounded-lg transition-colors"
           >
             ↻ Refresh
           </button>
@@ -456,15 +468,15 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
 
         {/* KPI row */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mt-4">
-          <div className="bg-black/20 rounded-xl p-3">
-            <p className="text-[10px] text-zinc-500 mb-1">Health Score</p>
+          <div className="bg-surface-hover rounded-xl p-3">
+            <p className="text-[10px] text-text-secondary mb-1">Health Score</p>
             <p className={`text-2xl font-bold ${scoreColor(machine.healthScore)}`}>{machine.healthScore}<span className="text-sm font-normal">%</span></p>
-            <div className="mt-2 h-1 bg-white/5 rounded-full overflow-hidden">
+            <div className="mt-2 h-1 bg-surface rounded-full overflow-hidden">
               <div className={`h-full rounded-full ${barColor(machine.healthScore)} transition-all duration-700`} style={{ width: `${machine.healthScore}%` }}/>
             </div>
           </div>
-          <div className="bg-black/20 rounded-xl p-3">
-            <p className="text-[10px] text-zinc-500 mb-1">Failure Prob</p>
+          <div className="bg-surface-hover rounded-xl p-3">
+            <p className="text-[10px] text-text-secondary mb-1">Failure Prob</p>
             <p className={`text-2xl font-bold ${machine.failureProb >= 0.5 ? "text-red-400" : machine.failureProb >= 0.2 ? "text-amber-400" : "text-green-400"}`}>
               {(machine.failureProb * 100).toFixed(0)}<span className="text-sm font-normal">%</span>
             </p>
@@ -472,23 +484,23 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
               {machine.riskLevel} RISK
             </p>
           </div>
-          <div className="bg-black/20 rounded-xl p-3">
-            <p className="text-[10px] text-zinc-500 mb-1">Remaining Life</p>
+          <div className="bg-surface-hover rounded-xl p-3">
+            <p className="text-[10px] text-text-secondary mb-1">Remaining Life</p>
             <p className={`text-2xl font-bold ${machine.rulHours < 24 ? "text-red-500" : machine.rulHours < 72 ? "text-red-400" : machine.rulHours < 168 ? "text-amber-400" : "text-green-400"}`}>
               {formatRUL(machine.rulHours)}
             </p>
-            <p className="text-[10px] text-zinc-600 mt-1">{machine.rulCapped ? "Capped > 7d" : `${machine.rulHours}h exact`}</p>
+            <p className="text-[10px] text-text-tertiary mt-1">{machine.rulCapped ? "Capped > 7d" : `${machine.rulHours}h exact`}</p>
           </div>
-          <div className="bg-black/20 rounded-xl p-3">
-            <p className="text-[10px] text-zinc-500 mb-1">Anomaly Score</p>
-            <p className={`text-2xl font-bold ${machine.isAnomaly ? "text-purple-400" : "text-zinc-300"}`}>{machine.anomalyScore.toFixed(2)}</p>
-            <p className={`text-[10px] mt-1 font-medium ${machine.isAnomaly ? "text-purple-400" : "text-zinc-600"}`}>
+          <div className="bg-surface-hover rounded-xl p-3">
+            <p className="text-[10px] text-text-secondary mb-1">Anomaly Score</p>
+            <p className={`text-2xl font-bold ${machine.isAnomaly ? "text-purple-400" : "text-text-primary"}`}>{machine.anomalyScore.toFixed(2)}</p>
+            <p className={`text-[10px] mt-1 font-medium ${machine.isAnomaly ? "text-purple-400" : "text-text-tertiary"}`}>
               {machine.isAnomaly ? "DETECTED" : "Normal"}
             </p>
           </div>
-          <div className="bg-black/20 rounded-xl p-3">
-            <p className="text-[10px] text-zinc-500 mb-1">Total Logs</p>
-            <p className="text-2xl font-bold text-white">{machine.nlp.totalLogs}</p>
+          <div className="bg-surface-hover rounded-xl p-3">
+            <p className="text-[10px] text-text-secondary mb-1">Total Logs</p>
+            <p className="text-2xl font-bold text-text-primary">{machine.nlp.totalLogs}</p>
             <p className="text-[10px] text-red-400 mt-1">{machine.nlp.emergencyCount} emergency</p>
           </div>
         </div>
@@ -496,8 +508,10 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
 
       {/* Live Sensors + Chart */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+
+        {/* Left: Sensor Cards */}
         <div className="lg:col-span-2 space-y-3">
-          <p className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider"></p>
+          <p className="text-[11px] font-semibold text-text-secondary uppercase tracking-wider"></p>
           <div className="grid grid-cols-2 gap-2">
             {[
               { label: "Temperature", value: `${machine.temperature.toFixed(1)}°C`,        warn: machine.temperature >= 85, icon: "🌡" },
@@ -509,29 +523,32 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
               { label: "Humidity",    value: `${machine.humidity.toFixed(1)}%`,            warn: false,                     icon: "💧" },
               { label: "Op. Hours",   value: `${machine.operating_hours.toFixed(0)} h`,    warn: false,                     icon: "🕐" },
             ].map(s => (
-              <div key={s.label} className={`bg-[#18191c] border rounded-xl p-3 ${s.warn ? "border-red-500/30 bg-red-500/5" : "border-white/5"}`}>
+              <div key={s.label} className={`bg-surface border rounded-xl p-3 ${s.warn ? "border-red-500/30 bg-red-500/5" : "border-border-color"}`}>
                 <div className="flex items-center gap-1.5 mb-1">
                   <span className="text-[12px]">{s.icon}</span>
-                  <p className="text-[10px] text-zinc-500">{s.label}</p>
+                  <p className="text-[10px] text-text-secondary">{s.label}</p>
                 </div>
-                <p className={`text-[15px] font-semibold ${s.warn ? "text-red-400" : "text-zinc-200"}`}>{s.value}</p>
+                <p className={`text-[15px] font-semibold ${s.warn ? "text-red-400" : "text-text-primary"}`}>{s.value}</p>
                 {s.warn && <p className="text-[9px] text-red-400/70 mt-0.5">Above threshold</p>}
               </div>
             ))}
           </div>
         </div>
 
-        <div className="lg:col-span-3 space-y-3">
-          <p className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider"></p>
-          <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
+        {/* Right: Chart + Gauge (col-span-3, full height) */}
+        <div className="lg:col-span-3 flex flex-col gap-3">
+          <p className="text-[11px] font-semibold text-text-secondary uppercase tracking-wider"></p>
+
+          {/* Sensor Chart */}
+          <div className="bg-surface border border-border-color rounded-xl p-4">
             <SensorChart data={sensorTrend}/>
-            <div className="flex gap-4 mt-3 pt-2 border-t border-white/5">
+            <div className="flex gap-4 mt-3 pt-2 border-t border-border-color">
               {[
-                { label: "Temperature", color: "bg-red-500"   },
+                { label: "Temperature",   color: "bg-red-500"   },
                 { label: "Vibration×100", color: "bg-amber-400" },
-                { label: "Noise",       color: "bg-blue-500"  },
+                { label: "Noise",         color: "bg-blue-500"  },
               ].map(s => (
-                <span key={s.label} className="flex items-center gap-1.5 text-[10px] text-zinc-500">
+                <span key={s.label} className="flex items-center gap-1.5 text-[10px] text-text-secondary">
                   <span className={`w-3 h-0.5 rounded ${s.color} inline-block`}/>
                   {s.label}
                 </span>
@@ -539,11 +556,14 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
             </div>
           </div>
 
-          <div className="bg-[#18191c] border border-white/5 rounded-xl p-4 flex items-center gap-5">
+          {/* FIX: Gauge + Health Classification — flex-1 agar tingginya mengisi sisa kolom */}
+          <div className="bg-surface border border-border-color rounded-xl p-4 flex items-center gap-5 flex-1">
             <Gauge score={machine.healthScore}/>
-            <div className="flex-1">
-              <p className="text-[10px] text-zinc-500 mb-1">Health Classification</p>
-              <p className={`text-[18px] font-bold mb-2 ${scoreColor(machine.healthScore)}`}>{machine.healthLabel}</p>
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] text-text-secondary mb-1">Health Classification</p>
+              <p className={`text-[18px] font-bold mb-2 ${scoreColor(machine.healthScore)}`}>
+                {machine.healthLabel}
+              </p>
               <div className="h-2.5 rounded-full overflow-hidden flex mb-1.5">
                 <div className="bg-green-500 transition-all duration-700" style={{ width: `${machine.probHealthy * 100}%` }}/>
                 <div className="bg-amber-400 transition-all duration-700" style={{ width: `${machine.probWarning * 100}%` }}/>
@@ -560,74 +580,74 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
       </div>
 
       {/* AI Model Output */}
-      <div className="bg-[#18191c] border border-white/5 rounded-2xl overflow-hidden">
-        <div className="px-5 py-3.5 border-b border-white/5 flex items-center justify-between">
-          <p className="text-[13px] font-semibold text-zinc-200">AI Model Output</p>
-          <span className="text-[10px] text-zinc-600">Random Forest · LSTM · IsolationForest</span>
+      <div className="bg-surface border border-border-color rounded-2xl overflow-hidden">
+        <div className="px-5 py-3.5 border-b border-border-color flex items-center justify-between">
+          <p className="text-[13px] font-semibold text-text-primary">AI Model Output</p>
+          <span className="text-[10px] text-text-tertiary">Random Forest · LSTM · IsolationForest</span>
         </div>
         <div className="p-5 space-y-5">
           <div>
             <div className="flex justify-between items-center mb-2">
               <div>
-                <span className="text-[11px] font-medium text-zinc-300">Task A</span>
-                <span className="text-[10px] text-zinc-600 ml-2">Failure Probability · Random Forest</span>
+                <span className="text-[11px] font-medium text-text-primary">Task A</span>
+                <span className="text-[10px] text-text-tertiary ml-2">Failure Probability · Random Forest</span>
               </div>
               <span className={`text-[12px] font-bold ${machine.failureProb >= 0.5 ? "text-red-400" : machine.failureProb >= 0.2 ? "text-amber-400" : "text-green-400"}`}>
                 {(machine.failureProb * 100).toFixed(1)}%
               </span>
             </div>
-            <div className="h-2.5 bg-white/5 rounded-full overflow-hidden relative">
+            <div className="h-2.5 bg-surface-hover rounded-full overflow-hidden relative">
               <div className="absolute top-0 bottom-0 w-px bg-amber-500/50" style={{ left: "20%" }}/>
               <div className="absolute top-0 bottom-0 w-px bg-red-500/50"   style={{ left: "50%" }}/>
               <div className={`h-full rounded-full transition-all duration-700 ${machine.failureProb >= 0.5 ? "bg-red-500" : machine.failureProb >= 0.2 ? "bg-amber-400" : "bg-green-500"}`}
                 style={{ width: `${machine.failureProb * 100}%` }}/>
             </div>
-            <div className="flex justify-between text-[9px] text-zinc-600 mt-1">
+            <div className="flex justify-between text-[9px] text-text-tertiary mt-1">
               <span>0%</span><span className="text-amber-500/60">20% low</span><span className="text-red-500/60">50% high</span><span>100%</span>
             </div>
           </div>
 
-          <div className="border-t border-white/5"/>
+          <div className="border-t border-border-color"/>
 
           <div>
             <div className="flex justify-between items-center mb-2">
               <div>
-                <span className="text-[11px] font-medium text-zinc-300">Task C</span>
-                <span className="text-[10px] text-zinc-600 ml-2">Remaining Useful Life · LSTM</span>
+                <span className="text-[11px] font-medium text-text-primary">Task C</span>
+                <span className="text-[10px] text-text-tertiary ml-2">Remaining Useful Life · LSTM</span>
               </div>
               <span className={`text-[12px] font-bold ${machine.rulHours < 24 ? "text-red-500" : machine.rulHours < 72 ? "text-red-400" : machine.rulHours < 168 ? "text-amber-400" : "text-green-400"}`}>
                 {formatRUL(machine.rulHours)}{machine.rulCapped ? " · capped" : ""}
               </span>
             </div>
-            <div className="h-2.5 bg-white/5 rounded-full overflow-hidden relative">
+            <div className="h-2.5 bg-surface-hover rounded-full overflow-hidden relative">
               <div className="absolute top-0 bottom-0 w-px bg-red-500/50"   style={{ left: "14.3%" }}/>
               <div className="absolute top-0 bottom-0 w-px bg-amber-500/50" style={{ left: "42.9%" }}/>
               <div className={`h-full rounded-full transition-all duration-700 ${machine.rulHours < 24 ? "bg-red-500" : machine.rulHours < 72 ? "bg-red-400" : machine.rulHours < 168 ? "bg-amber-400" : "bg-green-500"}`}
                 style={{ width: `${Math.min((machine.rulHours / 168) * 100, 100)}%` }}/>
             </div>
-            <div className="flex justify-between text-[9px] text-zinc-600 mt-1">
+            <div className="flex justify-between text-[9px] text-text-tertiary mt-1">
               <span>0h</span><span className="text-red-500/60">24h</span><span className="text-amber-500/60">72h</span><span>168h</span>
             </div>
           </div>
 
-          <div className="border-t border-white/5"/>
+          <div className="border-t border-border-color"/>
 
           <div>
             <div className="flex justify-between items-center mb-2">
               <div>
-                <span className="text-[11px] font-medium text-zinc-300">Anomaly</span>
-                <span className="text-[10px] text-zinc-600 ml-2">IsolationForest · threshold 0.62</span>
+                <span className="text-[11px] font-medium text-text-primary">Anomaly</span>
+                <span className="text-[10px] text-text-tertiary ml-2">IsolationForest · threshold 0.62</span>
               </div>
               <span className={`text-[12px] font-bold ${machine.isAnomaly ? "text-purple-400" : "text-green-400"}`}>
                 {machine.anomalyScore.toFixed(3)} · {machine.isAnomaly ? "DETECTED" : "Normal"}
               </span>
             </div>
-            <div className="h-2.5 bg-white/5 rounded-full overflow-hidden relative">
+            <div className="h-2.5 bg-surface-hover rounded-full overflow-hidden relative">
               <div className="absolute top-0 bottom-0 w-0.5 bg-purple-400/50" style={{ left: "62%" }}/>
-              <div className={`h-full rounded-full transition-all duration-700 ${machine.isAnomaly ? "bg-purple-500" : "bg-zinc-600"}`}
+              <div className={`h-full rounded-full transition-all duration-700 ${machine.isAnomaly ? "bg-purple-500" : "bg-text-tertiary"}`}
                 style={{ width: `${Math.min(machine.anomalyScore * 100, 100)}%` }}/>
             </div>
-            <div className="flex justify-between text-[9px] text-zinc-600 mt-1">
+            <div className="flex justify-between text-[9px] text-text-tertiary mt-1">
               <span>0</span><span className="text-purple-400/60">threshold 0.62</span><span>1.0</span>
             </div>
           </div>
@@ -636,9 +656,9 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
 
       {/* NLP + Keywords */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-1 bg-[#18191c] border border-white/5 rounded-2xl p-5 space-y-4">
+        <div className="lg:col-span-1 bg-surface border border-border-color rounded-2xl p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <p className="text-[13px] font-semibold text-zinc-200">NLP Summary</p>
+            <p className="text-[13px] font-semibold text-text-primary">NLP Summary</p>
             {machine.nlp.hasUrgentRecent && (
               <span className="text-[9px] bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-full font-bold animate-pulse">
                 URGENT 30D
@@ -647,10 +667,10 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
           </div>
           <div>
             <div className="flex justify-between text-[10px] mb-1.5">
-              <span className="text-zinc-500">Avg Severity</span>
-              <span className="text-zinc-400">{machine.nlp.avgSeverity.toFixed(2)} / 5</span>
+              <span className="text-text-secondary">Avg Severity</span>
+              <span className="text-text-secondary">{machine.nlp.avgSeverity.toFixed(2)} / 5</span>
             </div>
-            <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+            <div className="h-2 bg-surface-hover rounded-full overflow-hidden">
               <div className={`h-full rounded-full transition-all duration-700 ${machine.nlp.riskLevel === "High" ? "bg-red-500" : machine.nlp.riskLevel === "Medium" ? "bg-amber-400" : "bg-green-500"}`}
                 style={{ width: `${(machine.nlp.avgSeverity / 5) * 100}%` }}/>
             </div>
@@ -667,38 +687,38 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
               <div key={t.label}>
                 <div className="flex justify-between text-[10px] mb-1">
                   <span className={t.text}>{t.label}</span>
-                  <span className="text-zinc-500">{t.count} / {machine.nlp.totalLogs}</span>
+                  <span className="text-text-secondary">{t.count} / {machine.nlp.totalLogs}</span>
                 </div>
-                <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                <div className="h-1.5 bg-surface-hover rounded-full overflow-hidden">
                   <div className={`h-full rounded-full ${t.bar} transition-all duration-700`}
                     style={{ width: machine.nlp.totalLogs > 0 ? `${(t.count / machine.nlp.totalLogs) * 100}%` : "0%" }}/>
                 </div>
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/5">
+          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border-color">
             {[
               { label: "Urgent Rate",   value: `${(machine.nlp.urgentRate * 100).toFixed(0)}%`,   warn: machine.nlp.urgentRate > 0.3 },
               { label: "Avg Downtime",  value: `${machine.nlp.avgDowntime.toFixed(1)} h`,         warn: machine.nlp.avgDowntime > 5  },
               { label: "Days Since",    value: machine.nlp.daysSinceLastMaint < 0 ? "—" : `${machine.nlp.daysSinceLastMaint}d`, warn: machine.nlp.daysSinceLastMaint > 60 },
               { label: "Total Cost",    value: `Rp ${(machine.nlp.totalCost / 1_000_000).toFixed(1)}M`, warn: false },
             ].map(s => (
-              <div key={s.label} className="bg-white/3 rounded-lg p-2">
-                <p className="text-[9px] text-zinc-600">{s.label}</p>
-                <p className={`text-[12px] font-semibold ${s.warn ? "text-amber-400" : "text-zinc-300"}`}>{s.value}</p>
+              <div key={s.label} className="bg-surface-hover rounded-lg p-2">
+                <p className="text-[9px] text-text-tertiary">{s.label}</p>
+                <p className={`text-[12px] font-semibold ${s.warn ? "text-amber-400" : "text-text-primary"}`}>{s.value}</p>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="lg:col-span-2 bg-[#18191c] border border-white/5 rounded-2xl p-5 space-y-4">
+        <div className="lg:col-span-2 bg-surface border border-border-color rounded-2xl p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <p className="text-[13px] font-semibold text-zinc-200">Maintenance Insights</p>
-            <span className="text-[9px] text-zinc-600">TF-IDF · Stage 3 NLP</span>
+            <p className="text-[13px] font-semibold text-text-primary">Maintenance Insights</p>
+            <span className="text-[9px] text-text-tertiary">TF-IDF · Stage 3 NLP</span>
           </div>
           {machine.nlp.topKeywords.length > 0 && (
             <div>
-              <p className="text-[10px] text-zinc-600 uppercase tracking-wider mb-2">Top Keywords</p>
+              <p className="text-[10px] text-text-tertiary uppercase tracking-wider mb-2">Top Keywords</p>
               <div className="flex flex-wrap gap-2">
                 {machine.nlp.topKeywords.map((kw, i) => {
                   const intensity = kw.score / (machine.nlp.topKeywords[0]?.score || 1);
@@ -709,17 +729,17 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
                         backgroundColor: `rgba(168, 85, 247, ${0.05 + intensity * 0.1})`,
                       }}
                     >
-                      <span className="text-[9px] text-zinc-500 font-mono">#{i + 1}</span>
-                      <span className="text-[11px] text-zinc-200 font-medium">{kw.keyword}</span>
-                      <span className="text-[9px] text-zinc-500">{kw.score.toFixed(3)}</span>
+                      <span className="text-[9px] text-text-tertiary font-mono">#{i + 1}</span>
+                      <span className="text-[11px] text-text-primary font-medium">{kw.keyword}</span>
+                      <span className="text-[9px] text-text-tertiary">{kw.score.toFixed(3)}</span>
                     </div>
                   );
                 })}
               </div>
             </div>
           )}
-          <div className="pt-2 border-t border-white/5">
-            <p className="text-[10px] text-zinc-600 uppercase tracking-wider mb-2">Analysis</p>
+          <div className="pt-2 border-t border-border-color">
+            <p className="text-[10px] text-text-tertiary uppercase tracking-wider mb-2">Analysis</p>
             <div className="space-y-2">
               {[
                 {
@@ -727,21 +747,21 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
                   text: <>Risk level: <span className={`font-semibold ${machine.nlp.riskLevel === "High" ? "text-red-400" : machine.nlp.riskLevel === "Medium" ? "text-amber-400" : "text-green-400"}`}>{machine.nlp.riskLevel}</span> · avg severity {machine.nlp.avgSeverity.toFixed(2)}/5</>
                 },
                 {
-                  dot: machine.nlp.urgentRate > 0.3 ? "text-red-400" : "text-zinc-600",
-                  text: <>Urgent rate: <span className={`font-semibold ${machine.nlp.urgentRate > 0.3 ? "text-red-400" : "text-zinc-300"}`}>{(machine.nlp.urgentRate * 100).toFixed(1)}%</span> of all logs</>
+                  dot: machine.nlp.urgentRate > 0.3 ? "text-red-400" : "text-text-tertiary",
+                  text: <>Urgent rate: <span className={`font-semibold ${machine.nlp.urgentRate > 0.3 ? "text-red-400" : "text-text-primary"}`}>{(machine.nlp.urgentRate * 100).toFixed(1)}%</span> of all logs</>
                 },
                 {
-                  dot: "text-zinc-600",
-                  text: <>Dominant topic <span className="text-zinc-300 font-medium">#{machine.nlp.dominantTopic}</span> · avg <span className="text-zinc-300">{machine.nlp.avgTechTerms.toFixed(1)}</span> tech terms, <span className="text-zinc-300">{machine.nlp.avgProblemKw.toFixed(1)}</span> problem keywords</>
+                  dot: "text-text-tertiary",
+                  text: <>Dominant topic <span className="text-text-primary font-medium">#{machine.nlp.dominantTopic}</span> · avg <span className="text-text-primary">{machine.nlp.avgTechTerms.toFixed(1)}</span> tech terms, <span className="text-text-primary">{machine.nlp.avgProblemKw.toFixed(1)}</span> problem keywords</>
                 },
                 {
-                  dot: machine.nlp.emergencyCount > 0 ? "text-red-400" : "text-zinc-600",
+                  dot: machine.nlp.emergencyCount > 0 ? "text-red-400" : "text-text-tertiary",
                   text: machine.nlp.emergencyCount > 0
                     ? <><span className="text-red-400 font-semibold">{machine.nlp.emergencyCount}× emergency</span> recorded in history</>
                     : <>No emergencies recorded</>
                 },
                 {
-                  dot: machine.nlp.hasUrgentRecent ? "text-red-400" : "text-zinc-600",
+                  dot: machine.nlp.hasUrgentRecent ? "text-red-400" : "text-text-tertiary",
                   text: machine.nlp.hasUrgentRecent
                     ? <span className="text-red-400 font-semibold">Emergency occurred within last 30 days</span>
                     : <>No emergency in the last 30 days</>
@@ -749,7 +769,7 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
               ].map((item, i) => (
                 <div key={i} className="flex items-start gap-2">
                   <span className={`${item.dot} text-[10px] mt-0.5 shrink-0`}>●</span>
-                  <p className="text-[11px] text-zinc-400 leading-relaxed">{item.text}</p>
+                  <p className="text-[11px] text-text-secondary leading-relaxed">{item.text}</p>
                 </div>
               ))}
             </div>
@@ -757,10 +777,10 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
-      {/* Technician Notes — always visible, no hide button */}
-      <div className="bg-[#18191c] border border-white/5 rounded-2xl overflow-hidden">
-        <div className="flex items-center gap-3 px-5 py-4 border-b border-white/5">
-          <p className="text-[13px] font-semibold text-zinc-200">Technician Notes</p>
+      {/* Technician Notes */}
+      <div className="bg-surface border border-border-color rounded-2xl overflow-hidden">
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-border-color">
+          <p className="text-[13px] font-semibold text-text-primary">Technician Notes</p>
           <div className="flex gap-2">
             <span className="text-[9px] bg-red-500/20 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded-full">{machine.nlp.emergencyCount} emergency</span>
             <span className="text-[9px] bg-amber-400/20 text-amber-400 border border-amber-400/20 px-1.5 py-0.5 rounded-full">{machine.nlp.correctiveCount} corrective</span>
@@ -770,7 +790,7 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
 
         <div className="px-5 pb-5 space-y-3 pt-4">
 
-          {/* Emergency — default closed */}
+          {/* Emergency */}
           <div className="rounded-xl border border-red-500/25 bg-red-500/5 overflow-hidden">
             <button
               onClick={() => setEmergencyOpen(v => !v)}
@@ -788,11 +808,11 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
               <div className="px-4 pb-4 space-y-2.5 border-t border-red-500/10 pt-3">
                 {machine.history.filter(h => h.type === "Emergency").length > 0 ? (
                   machine.history.filter(h => h.type === "Emergency").map((rec, i) => (
-                    <div key={i} className="flex gap-3 bg-black/20 rounded-lg px-3 py-2.5">
+                    <div key={i} className="flex gap-3 bg-surface-hover rounded-lg px-3 py-2.5">
                       <div className="w-0.5 bg-red-500 rounded-full shrink-0 self-stretch"/>
                       <div>
-                        <p className="text-[12px] text-zinc-200 leading-relaxed">&ldquo;{rec.note}&rdquo;</p>
-                        <div className="flex gap-3 mt-1.5 text-[10px] text-zinc-500">
+                        <p className="text-[12px] text-text-primary leading-relaxed">&ldquo;{rec.note}&rdquo;</p>
+                        <div className="flex gap-3 mt-1.5 text-[10px] text-text-secondary">
                           <span>📅 {rec.date}</span>
                           <span>⏱ {rec.downtime}</span>
                           <span>💰 {rec.cost}</span>
@@ -801,13 +821,13 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
                     </div>
                   ))
                 ) : (
-                  <p className="text-[11px] text-zinc-600 italic text-center py-3">No emergency records</p>
+                  <p className="text-[11px] text-text-tertiary italic text-center py-3">No emergency records</p>
                 )}
               </div>
             )}
           </div>
 
-          {/* Corrective — default closed */}
+          {/* Corrective */}
           <div className="rounded-xl border border-amber-400/25 bg-amber-400/5 overflow-hidden">
             <button
               onClick={() => setCorrectiveOpen(v => !v)}
@@ -825,11 +845,11 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
               <div className="px-4 pb-4 space-y-2.5 border-t border-amber-400/10 pt-3">
                 {machine.history.filter(h => h.type === "Corrective").length > 0 ? (
                   machine.history.filter(h => h.type === "Corrective").map((rec, i) => (
-                    <div key={i} className="flex gap-3 bg-black/20 rounded-lg px-3 py-2.5">
+                    <div key={i} className="flex gap-3 bg-surface-hover rounded-lg px-3 py-2.5">
                       <div className="w-0.5 bg-amber-400 rounded-full shrink-0 self-stretch"/>
                       <div>
-                        <p className="text-[12px] text-zinc-200 leading-relaxed">&ldquo;{rec.note}&rdquo;</p>
-                        <div className="flex gap-3 mt-1.5 text-[10px] text-zinc-500">
+                        <p className="text-[12px] text-text-primary leading-relaxed">&ldquo;{rec.note}&rdquo;</p>
+                        <div className="flex gap-3 mt-1.5 text-[10px] text-text-secondary">
                           <span>📅 {rec.date}</span>
                           <span>⏱ {rec.downtime}</span>
                           <span>💰 {rec.cost}</span>
@@ -838,13 +858,13 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
                     </div>
                   ))
                 ) : (
-                  <p className="text-[11px] text-zinc-600 italic text-center py-3">No corrective records</p>
+                  <p className="text-[11px] text-text-tertiary italic text-center py-3">No corrective records</p>
                 )}
               </div>
             )}
           </div>
 
-          {/* Preventive — default closed */}
+          {/* Preventive */}
           <div className="rounded-xl border border-green-500/25 bg-green-500/5 overflow-hidden">
             <button
               onClick={() => setPreventiveOpen(v => !v)}
@@ -862,11 +882,11 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
               <div className="px-4 pb-4 space-y-2.5 border-t border-green-500/10 pt-3">
                 {machine.history.filter(h => h.type === "Preventive").length > 0 ? (
                   machine.history.filter(h => h.type === "Preventive").map((rec, i) => (
-                    <div key={i} className="flex gap-3 bg-black/20 rounded-lg px-3 py-2.5">
+                    <div key={i} className="flex gap-3 bg-surface-hover rounded-lg px-3 py-2.5">
                       <div className="w-0.5 bg-green-500 rounded-full shrink-0 self-stretch"/>
                       <div>
-                        <p className="text-[12px] text-zinc-200 leading-relaxed">&ldquo;{rec.note}&rdquo;</p>
-                        <div className="flex gap-3 mt-1.5 text-[10px] text-zinc-500">
+                        <p className="text-[12px] text-text-primary leading-relaxed">&ldquo;{rec.note}&rdquo;</p>
+                        <div className="flex gap-3 mt-1.5 text-[10px] text-text-secondary">
                           <span>📅 {rec.date}</span>
                           <span>⏱ {rec.downtime}</span>
                           <span>💰 {rec.cost}</span>
@@ -875,7 +895,7 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
                     </div>
                   ))
                 ) : (
-                  <p className="text-[11px] text-zinc-600 italic text-center py-3">No preventive records</p>
+                  <p className="text-[11px] text-text-tertiary italic text-center py-3">No preventive records</p>
                 )}
               </div>
             )}
@@ -884,13 +904,13 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
-      {/* AI Recommendation — text only, no button */}
+      {/* AI Recommendation */}
       {machine.recommendation && (
         <div className={`border rounded-2xl p-5 ${statusBg}`}>
           <div className="flex items-start gap-4">
-            <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-lg shrink-0">🤖</div>
+            <div className="w-9 h-9 rounded-xl bg-surface-hover flex items-center justify-center text-lg shrink-0">🤖</div>
             <div className="flex-1">
-              <p className="text-[10px] text-zinc-500 mb-1 uppercase tracking-wider">AI Recommendation</p>
+              <p className="text-[10px] text-text-secondary mb-1 uppercase tracking-wider">AI Recommendation</p>
               <p className={`text-[14px] font-medium leading-relaxed ${statusAccent}`}>{machine.recommendation}</p>
             </div>
           </div>
@@ -898,10 +918,10 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
       )}
 
       {/* Maintenance History */}
-      <div className="bg-[#18191c] border border-white/5 rounded-2xl overflow-hidden">
-        <div className="px-5 py-3.5 border-b border-white/5 flex items-center justify-between">
-          <p className="text-[13px] font-semibold text-zinc-200">Maintenance History</p>
-          <span className="text-[11px] text-zinc-500">
+      <div className="bg-surface border border-border-color rounded-2xl overflow-hidden">
+        <div className="px-5 py-3.5 border-b border-border-color flex items-center justify-between">
+          <p className="text-[13px] font-semibold text-text-primary">Maintenance History</p>
+          <span className="text-[11px] text-text-secondary">
             {machine.history.length > 0
               ? `${historyStart + 1}–${Math.min(historyEnd, machine.history.length)} of ${machine.history.length}`
               : "No records"}
@@ -909,38 +929,38 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
         </div>
 
         {machine.history.length === 0 ? (
-          <div className="py-12 text-center text-[12px] text-zinc-600">No maintenance history yet</div>
+          <div className="py-12 text-center text-[12px] text-text-tertiary">No maintenance history yet</div>
         ) : (
           <>
             <table className="w-full">
               <thead>
-                <tr className="border-b border-white/5 bg-white/2">
+                <tr className="border-b border-border-color bg-surface-hover">
                   {["Date", "Type", "Downtime", "Cost", "Notes"].map(h => (
-                    <th key={h} className="text-left text-[10px] font-semibold text-zinc-600 uppercase tracking-wider px-5 py-3">{h}</th>
+                    <th key={h} className="text-left text-[10px] font-semibold text-text-tertiary uppercase tracking-wider px-5 py-3">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {paginatedHistory.map((r, i) => (
-                  <tr key={`${currentHistoryPage}-${i}`} className="border-b border-white/5 last:border-0 hover:bg-white/3 transition-colors">
-                    <td className="px-5 py-3 text-[12px] text-zinc-400 font-mono">{r.date}</td>
+                  <tr key={`${currentHistoryPage}-${i}`} className="border-b border-border-color last:border-0 hover:bg-surface-hover transition-colors">
+                    <td className="px-5 py-3 text-[12px] text-text-secondary font-mono">{r.date}</td>
                     <td className="px-5 py-3"><TypeBadge type={r.type}/></td>
-                    <td className="px-5 py-3 text-[12px] text-zinc-400">{r.downtime}</td>
-                    <td className="px-5 py-3 text-[12px] text-zinc-400">{r.cost}</td>
-                    <td className="px-5 py-3 text-[12px] text-zinc-500 max-w-xs truncate" title={r.note}>{r.note}</td>
+                    <td className="px-5 py-3 text-[12px] text-text-secondary">{r.downtime}</td>
+                    <td className="px-5 py-3 text-[12px] text-text-secondary">{r.cost}</td>
+                    <td className="px-5 py-3 text-[12px] text-text-secondary max-w-xs truncate" title={r.note}>{r.note}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
 
             {totalHistoryPages > 1 && (
-              <div className="px-5 py-3 border-t border-white/5 flex items-center justify-between">
-                <span className="text-[11px] text-zinc-600">Page {currentHistoryPage} of {totalHistoryPages}</span>
+              <div className="px-5 py-3 border-t border-border-color flex items-center justify-between">
+                <span className="text-[11px] text-text-tertiary">Page {currentHistoryPage} of {totalHistoryPages}</span>
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
                     disabled={currentHistoryPage === 1}
-                    className="text-[11px] px-3 py-1.5 rounded-lg border border-white/10 text-zinc-400 hover:text-white hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    className="text-[11px] px-3 py-1.5 rounded-lg border border-border-color text-text-secondary hover:text-text-primary hover:bg-surface-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                   >
                     ← Prev
                   </button>
@@ -950,8 +970,8 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
                       onClick={() => setHistoryPage(pageNum)}
                       className={`text-[11px] w-7 h-7 rounded-lg transition-colors ${
                         pageNum === currentHistoryPage
-                          ? "bg-white/15 text-white font-semibold"
-                          : "text-zinc-500 hover:text-white hover:bg-white/5"
+                          ? "bg-sidebar-active-bg text-sidebar-active-text font-semibold"
+                          : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
                       }`}
                     >
                       {pageNum}
@@ -960,7 +980,7 @@ export default function MachineDetailPage({ params }: { params: Promise<{ id: st
                   <button
                     onClick={() => setHistoryPage(p => Math.min(totalHistoryPages, p + 1))}
                     disabled={currentHistoryPage === totalHistoryPages}
-                    className="text-[11px] px-3 py-1.5 rounded-lg border border-white/10 text-zinc-400 hover:text-white hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    className="text-[11px] px-3 py-1.5 rounded-lg border border-border-color text-text-secondary hover:text-text-primary hover:bg-surface-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                   >
                     Next →
                   </button>

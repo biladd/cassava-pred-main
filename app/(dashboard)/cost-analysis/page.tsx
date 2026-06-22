@@ -28,14 +28,14 @@ function fmt(n: number) {
 }
 
 function Skeleton({ className }: { className?: string }) {
-  return <div className={`animate-pulse bg-white/5 rounded ${className}`}/>;
+  return <div className={`animate-pulse bg-surface-hover rounded ${className}`}/>;
 }
 
 // ── ROI Chart (SVG) ────────────────────────────────────────────────────────
 function ROIChart({ data }: { data: MonthlyData[] }) {
   if (data.length === 0) return (
     <div className="h-40 flex items-center justify-center">
-      <p className="text-[11px] text-zinc-600">No data available</p>
+      <p className="text-[11px] text-text-tertiary">No data available</p>
     </div>
   );
 
@@ -51,20 +51,20 @@ function ROIChart({ data }: { data: MonthlyData[] }) {
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" aria-label="ROI Timeline">
       {[0, 50, 100, 150, 200].filter(v => v <= maxROI + 20).map(v => (
         <g key={v}>
-          <line x1={padL} y1={toY(v)} x2={W - padR} y2={toY(v)} stroke="#ffffff08" strokeWidth="0.5"/>
-          <text x={padL - 4} y={toY(v) + 3.5} textAnchor="end" fill="#555" fontSize="8">{v}%</text>
+          <line x1={padL} y1={toY(v)} x2={W - padR} y2={toY(v)} stroke="var(--border-color)" strokeWidth="0.5"/>
+          <text x={padL - 4} y={toY(v) + 3.5} textAnchor="end" fill="var(--text-tertiary)" fontSize="8">{v}%</text>
         </g>
       ))}
       {/* Break-even line */}
-      <line x1={padL} y1={toY(100)} x2={W - padR} y2={toY(100)} stroke="#ffffff20" strokeWidth="0.8" strokeDasharray="4 2"/>
-      <text x={W - padR + 2} y={toY(100) + 3} fill="#555" fontSize="7">Break-even</text>
+      <line x1={padL} y1={toY(100)} x2={W - padR} y2={toY(100)} stroke="var(--text-tertiary)" strokeWidth="0.8" strokeDasharray="4 2" opacity="0.5"/>
+      <text x={W - padR + 2} y={toY(100) + 3} fill="var(--text-tertiary)" fontSize="7">Break-even</text>
 
       <path d={path} fill="none" stroke="#4ade80" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
       {data.map((d, i) => (
         <circle key={i} cx={toX(i)} cy={toY(d.roi)} r="3" fill="#4ade80"/>
       ))}
       {data.map((d, i) => (
-        <text key={i} x={toX(i)} y={H - 6} textAnchor="middle" fill="#555" fontSize="8">{d.month}</text>
+        <text key={i} x={toX(i)} y={H - 6} textAnchor="middle" fill="var(--text-tertiary)" fontSize="8">{d.month}</text>
       ))}
     </svg>
   );
@@ -162,8 +162,8 @@ export default function CostAnalysisPage() {
     <div className="p-6">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-lg font-medium text-white">Cost Analysis</h1>
-        <p className="text-[12px] text-zinc-500 mt-0.5">ROI analysis for predictive maintenance implementation</p>
+        <h1 className="text-lg font-medium text-text-primary">Cost Analysis</h1>
+        <p className="text-[12px] text-text-secondary mt-0.5">ROI analysis for predictive maintenance implementation</p>
       </div>
 
       {/* Error */}
@@ -177,24 +177,24 @@ export default function CostAnalysisPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
         {loading ? Array.from({length:4}).map((_,i) => <Skeleton key={i} className="h-24 rounded-xl"/>) : (
           <>
-            <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
-              <p className="text-[11px] text-zinc-500 mb-1">Total Savings (est.)</p>
+            <div className="bg-surface border border-border-color rounded-xl p-4">
+              <p className="text-[11px] text-text-secondary mb-1">Total Savings (est.)</p>
               <p className="text-xl font-medium text-green-400">{fmt(totalSavings)}</p>
-              <p className="text-[10px] text-zinc-500 mt-1">from preventive maintenance</p>
+              <p className="text-[10px] text-text-secondary mt-1">from preventive maintenance</p>
             </div>
-            <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
-              <p className="text-[11px] text-zinc-500 mb-1">Downtime Reduction</p>
+            <div className="bg-surface border border-border-color rounded-xl p-4">
+              <p className="text-[11px] text-text-secondary mb-1">Downtime Reduction</p>
               <p className="text-xl font-medium text-blue-400">{downtimeReduction}%</p>
-              <p className="text-[10px] text-zinc-500 mt-1">vs without predictive</p>
+              <p className="text-[10px] text-text-secondary mt-1">vs without predictive</p>
             </div>
-            <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
-              <p className="text-[11px] text-zinc-500 mb-1">ROI</p>
+            <div className="bg-surface border border-border-color rounded-xl p-4">
+              <p className="text-[11px] text-text-secondary mb-1">ROI</p>
               <p className="text-xl font-medium text-green-400">{roi}%</p>
-              <p className="text-[10px] text-zinc-500 mt-1">return on investment</p>
+              <p className="text-[10px] text-text-secondary mt-1">return on investment</p>
             </div>
-            <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
-              <p className="text-[11px] text-zinc-500 mb-1">Failures Prevented</p>
-              <p className="text-xl font-medium text-white">{preventedFailures}</p>
+            <div className="bg-surface border border-border-color rounded-xl p-4">
+              <p className="text-[11px] text-text-secondary mb-1">Failures Prevented</p>
+              <p className="text-xl font-medium text-text-primary">{preventedFailures}</p>
               <p className="text-[10px] text-red-400 mt-1">{totalEmergencies} emergencies occurred</p>
             </div>
           </>
@@ -202,14 +202,14 @@ export default function CostAnalysisPage() {
       </div>
 
       {/* Before vs After */}
-      <div className="bg-[#18191c] border border-white/5 rounded-xl p-4 mb-4">
-        <p className="text-[13px] font-medium text-zinc-300 mb-4">Before vs After Comparison</p>
+      <div className="bg-surface border border-border-color rounded-xl p-4 mb-4">
+        <p className="text-[13px] font-medium text-text-secondary mb-4">Before vs After Comparison</p>
         {loading ? <Skeleton className="h-32"/> : (
           <table className="w-full">
             <thead>
-              <tr className="border-b border-white/5">
+              <tr className="border-b border-border-color">
                 {["Metric", "Before", "After", "Savings"].map(h => (
-                  <th key={h} className="text-left text-[11px] font-medium text-zinc-500 px-3 py-2">{h}</th>
+                  <th key={h} className="text-left text-[11px] font-medium text-text-secondary px-3 py-2">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -244,9 +244,9 @@ export default function CostAnalysisPage() {
                   savingsColor: "text-blue-400",
                 },
               ].map(row => (
-                <tr key={row.metric} className="border-b border-white/5 last:border-0">
-                  <td className="px-3 py-3 text-[12px] text-zinc-400">{row.metric}</td>
-                  <td className="px-3 py-3 text-[12px] text-zinc-500">{row.before}</td>
+                <tr key={row.metric} className="border-b border-border-color last:border-0">
+                  <td className="px-3 py-3 text-[12px] text-text-secondary">{row.metric}</td>
+                  <td className="px-3 py-3 text-[12px] text-text-tertiary">{row.before}</td>
                   <td className="px-3 py-3 text-[12px] text-green-400">{row.after}</td>
                   <td className={`px-3 py-3 text-[12px] font-medium ${row.savingsColor}`}>{row.savings}</td>
                 </tr>
@@ -257,14 +257,14 @@ export default function CostAnalysisPage() {
       </div>
 
       {/* ROI Timeline */}
-      <div className="bg-[#18191c] border border-white/5 rounded-xl p-4 mb-4">
-        <p className="text-[13px] font-medium text-zinc-300 mb-4">ROI Timeline</p>
+      <div className="bg-surface border border-border-color rounded-xl p-4 mb-4">
+        <p className="text-[13px] font-medium text-text-secondary mb-4">ROI Timeline</p>
         {loading ? <Skeleton className="h-40"/> : <ROIChart data={monthly}/>}
       </div>
 
       {/* Cost per machine */}
-      <div className="bg-[#18191c] border border-white/5 rounded-xl p-4 mb-4">
-        <p className="text-[13px] font-medium text-zinc-300 mb-4">Cost per Machine</p>
+      <div className="bg-surface border border-border-color rounded-xl p-4 mb-4">
+        <p className="text-[13px] font-medium text-text-secondary mb-4">Cost per Machine</p>
         {loading ? (
           <div className="flex flex-col gap-3">{Array.from({length:5}).map((_,i) => <Skeleton key={i} className="h-10"/>)}</div>
         ) : (
@@ -272,13 +272,13 @@ export default function CostAnalysisPage() {
             {costData.slice(0, 10).map(c => (
               <div key={c.machine}>
                 <div className="flex justify-between items-center mb-1.5">
-                  <span className="text-[12px] font-medium text-zinc-300">{c.machine}</span>
+                  <span className="text-[12px] font-medium text-text-secondary">{c.machine}</span>
                   <div className="flex items-center gap-3">
-                    <span className="text-[11px] text-zinc-500">{c.downtimeHours.toFixed(1)} hrs downtime</span>
-                    <span className="text-[12px] text-zinc-400">{fmt(c.total)}</span>
+                    <span className="text-[11px] text-text-secondary">{c.downtimeHours.toFixed(1)} hrs downtime</span>
+                    <span className="text-[12px] text-text-secondary">{fmt(c.total)}</span>
                   </div>
                 </div>
-                <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                <div className="h-1.5 bg-surface-hover rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full ${c.emergency > 0 ? "bg-red-500" : c.corrective > 0 ? "bg-amber-400" : "bg-green-500"}`}
                     style={{width:`${(c.total / maxTotal) * 100}%`}}
@@ -296,42 +296,42 @@ export default function CostAnalysisPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-[#18191c] border border-white/5 rounded-xl overflow-hidden mb-4">
+      <div className="bg-surface border border-border-color rounded-xl overflow-hidden mb-4">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-white/5">
+            <tr className="border-b border-border-color">
               {["Machine", "Emergency", "Corrective", "Preventive", "Total", "Downtime"].map(h => (
-                <th key={h} className="text-left text-[11px] font-medium text-zinc-500 px-4 py-3">{h}</th>
+                <th key={h} className="text-left text-[11px] font-medium text-text-secondary px-4 py-3">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {loading ? Array.from({length:5}).map((_,i) => (
-              <tr key={i} className="border-b border-white/5">
+              <tr key={i} className="border-b border-border-color">
                 {Array.from({length:6}).map((_,j) => (
                   <td key={j} className="px-4 py-3"><Skeleton className="h-4"/></td>
                 ))}
               </tr>
             )) : costData.map(c => (
-              <tr key={c.machine} className="border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors">
+              <tr key={c.machine} className="border-b border-border-color last:border-0 hover:bg-surface-hover transition-colors">
                 <td className="px-4 py-3 text-[12px] font-medium text-blue-400">{c.machine}</td>
                 <td className="px-4 py-3 text-[12px] text-red-400">{c.emergency > 0 ? fmt(c.emergency) : "-"}</td>
                 <td className="px-4 py-3 text-[12px] text-amber-400">{c.corrective > 0 ? fmt(c.corrective) : "-"}</td>
                 <td className="px-4 py-3 text-[12px] text-green-400">{c.preventive > 0 ? fmt(c.preventive) : "-"}</td>
-                <td className="px-4 py-3 text-[12px] font-medium text-white">{fmt(c.total)}</td>
-                <td className="px-4 py-3 text-[12px] text-zinc-400">{c.downtimeHours.toFixed(1)} hrs</td>
+                <td className="px-4 py-3 text-[12px] font-medium text-text-primary">{fmt(c.total)}</td>
+                <td className="px-4 py-3 text-[12px] text-text-secondary">{c.downtimeHours.toFixed(1)} hrs</td>
               </tr>
             ))}
           </tbody>
           {!loading && (
             <tfoot>
-              <tr className="border-t border-white/10">
-                <td className="px-4 py-3 text-[12px] font-medium text-zinc-400">Total</td>
+              <tr className="border-t border-border-color">
+                <td className="px-4 py-3 text-[12px] font-medium text-text-secondary">Total</td>
                 <td className="px-4 py-3 text-[12px] text-red-400">{fmt(totalEmergency)}</td>
                 <td className="px-4 py-3 text-[12px] text-amber-400">{fmt(totalCorrective)}</td>
                 <td className="px-4 py-3 text-[12px] text-green-400">{fmt(totalPreventive)}</td>
-                <td className="px-4 py-3 text-[12px] font-medium text-white">{fmt(grandTotal)}</td>
-                <td className="px-4 py-3 text-[12px] text-zinc-400">{totalDowntime.toFixed(1)} hrs</td>
+                <td className="px-4 py-3 text-[12px] font-medium text-text-primary">{fmt(grandTotal)}</td>
+                <td className="px-4 py-3 text-[12px] text-text-secondary">{totalDowntime.toFixed(1)} hrs</td>
               </tr>
             </tfoot>
           )}
@@ -339,8 +339,8 @@ export default function CostAnalysisPage() {
       </div>
 
       {/* Assumptions */}
-      <div className="bg-[#18191c] border border-l-2 border-l-blue-500 border-white/5 rounded-xl p-4">
-        <p className="text-[12px] font-medium text-zinc-300 mb-2">Assumptions & Model Info</p>
+      <div className="bg-surface border border-l-2 border-l-blue-500 border-border-color rounded-xl p-4">
+        <p className="text-[12px] font-medium text-text-secondary mb-2">Assumptions & Model Info</p>
         <div className="grid grid-cols-2 gap-x-8 gap-y-1">
           {[
             ["Model", "Random Forest + SMOTE"],
@@ -349,12 +349,12 @@ export default function CostAnalysisPage() {
             ["Avg Emergency Cost", fmt(8_500_000) + " per incident"],
           ].map(([k, v]) => (
             <div key={k} className="flex flex-col">
-              <span className="text-[10px] text-zinc-600">{k}</span>
-              <span className="text-[11px] text-zinc-400">{v}</span>
+              <span className="text-[10px] text-text-tertiary">{k}</span>
+              <span className="text-[11px] text-text-secondary">{v}</span>
             </div>
           ))}
         </div>
-        <p className="text-[10px] text-zinc-600 mt-3">
+        <p className="text-[10px] text-text-tertiary mt-3">
           Note: ROI calculation based on actual maintenance cost data from Supabase. Savings estimation uses average emergency and preventive maintenance costs.
         </p>
       </div>

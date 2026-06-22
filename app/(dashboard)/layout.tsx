@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import { ThemeToggle } from "./theme-toggle";
 
 const navItems = [
   {
@@ -118,12 +119,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [fetchMachineStatuses]);
 
   return (
-    <div className="flex h-screen bg-[#111214] overflow-hidden">
+    <div className="flex h-screen bg-background overflow-hidden">
       {/* Sidebar */}
-      <aside className="w-44 min-w-[176px] bg-[#18191c] border-r border-white/5 flex flex-col py-5 shrink-0">
-        <p className="text-[10px] font-medium tracking-widest text-zinc-500 px-4 mb-5">
-          CASSAVA GROUP
-        </p>
+      <aside className="w-44 min-w-[176px] bg-sidebar-bg border-r border-border-color flex flex-col py-5 shrink-0">
+        <div className="flex items-center justify-between px-4 mb-5">
+          <p className="text-[10px] font-medium tracking-widest text-text-tertiary">
+            CASSAVA GROUP
+          </p>
+          <ThemeToggle />
+        </div>
 
         <nav className="flex flex-col gap-0.5 px-2">
           {navItems.map((item) => (
@@ -132,8 +136,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               href={item.href}
               className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-[13px] transition-colors ${
                 pathname === item.href || pathname.startsWith(item.href + "/")
-                  ? "bg-white/10 text-white"
-                  : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5"
+                  ? "bg-sidebar-active-bg text-sidebar-active-text"
+                  : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
               }`}
             >
               <span className="flex items-center justify-center w-4 h-4 shrink-0">{item.icon}</span>
@@ -142,7 +146,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           ))}
         </nav>
 
-        <p className="text-[10px] font-medium tracking-widest text-zinc-600 px-4 mt-6 mb-2">
+        <p className="text-[10px] font-medium tracking-widest text-text-tertiary px-4 mt-6 mb-2">
           MACHINES
         </p>
 
@@ -152,8 +156,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             // Skeleton loading
             Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="flex items-center justify-between px-3 py-1.5">
-                <div className="w-10 h-3 bg-white/5 rounded animate-pulse"/>
-                <div className="w-2 h-2 rounded-full bg-white/5 animate-pulse"/>
+                <div className="w-10 h-3 bg-surface-hover rounded animate-pulse"/>
+                <div className="w-2 h-2 rounded-full bg-surface-hover animate-pulse"/>
               </div>
             ))
             
@@ -164,8 +168,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 href={`/machines/${m.id}`}
                 className={`flex items-center justify-between px-3 py-1.5 text-[12px] rounded-md transition-colors ${
                   pathname === `/machines/${m.id}`
-                    ? "text-white bg-white/10"
-                    : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5"
+                    ? "text-sidebar-active-text bg-sidebar-active-bg"
+                    : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
                 }`}
               >
                 <span>{m.id}</span>
@@ -175,13 +179,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           )}
         </div>
 
-        <div className="px-2 py-3 border-t border-white/5 mt-2 shrink-0">
+        <div className="px-2 py-3 border-t border-border-color mt-2 shrink-0">
           <button
             onClick={async () => {
               await supabase.auth.signOut()
               window.location.href = '/login'
             }}
-            className="flex items-center gap-2.5 px-3 py-2 rounded-md text-[13px] text-zinc-400 hover:text-red-400 hover:bg-red-500/10 transition-colors w-full"
+            className="flex items-center gap-2.5 px-3 py-2 rounded-md text-[13px] text-text-secondary hover:text-red-400 hover:bg-red-500/10 transition-colors w-full"
           >
             <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
@@ -192,7 +196,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         
       </aside>
       {/* Main content */}
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto bg-background">
         {children}
       </main>
     </div>

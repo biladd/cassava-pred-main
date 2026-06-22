@@ -79,7 +79,7 @@ function SensorChart({ data }: { data: SensorTrend[] }) {
 
   if (data.length === 0) return (
     <div className="h-40 flex items-center justify-center">
-      <p className="text-[11px] text-zinc-600">No sensor data</p>
+      <p className="text-[11px] text-text-tertiary">No sensor data</p>
     </div>
   );
 
@@ -100,13 +100,13 @@ function SensorChart({ data }: { data: SensorTrend[] }) {
         const v = minV + range * t;
         return (
           <g key={i}>
-            <line x1={padL} y1={toY(v)} x2={W - padR} y2={toY(v)} stroke="#ffffff10" strokeWidth="0.5"/>
-            <text x={padL - 4} y={toY(v) + 3.5} textAnchor="end" fill="#555" fontSize="7">{v.toFixed(0)}</text>
+            <line x1={padL} y1={toY(v)} x2={W - padR} y2={toY(v)} stroke="var(--border-color)" strokeWidth="0.5"/>
+            <text x={padL - 4} y={toY(v) + 3.5} textAnchor="end" fill="var(--text-tertiary)" fontSize="7">{v.toFixed(0)}</text>
           </g>
         );
       })}
       {data.filter((_, i) => i % step === 0).map((d, i) => (
-        <text key={i} x={toX(i * step)} y={H - 6} textAnchor="middle" fill="#555" fontSize="7">{d.label}</text>
+        <text key={i} x={toX(i * step)} y={H - 6} textAnchor="middle" fill="var(--text-tertiary)" fontSize="7">{d.label}</text>
       ))}
       <path d={makePath(data.map(d => d.temperature))} fill="none" stroke="#e24b4a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
       <path d={makePath(data.map(d => d.vibration * 100))} fill="none" stroke="#ef9f27" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="4 2"/>
@@ -123,7 +123,7 @@ function formatRUL(rulHours: number): string {
 }
 
 function Skeleton({ className }: { className?: string }) {
-  return <div className={`animate-pulse bg-white/5 rounded ${className}`}/>;
+  return <div className={`animate-pulse bg-surface-hover rounded ${className}`}/>;
 }
 
 export default function DashboardPage() {
@@ -254,11 +254,11 @@ export default function DashboardPage() {
       {/* Topbar */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-lg font-medium text-white">Predictive Maintenance Dashboard</h1>
+          <h1 className="text-lg font-medium text-text-primary">Predictive Maintenance Dashboard</h1>
           {lastUpdate && (
-            <p className="text-[11px] text-zinc-500 mt-0.5">
+            <p className="text-[11px] text-text-secondary mt-0.5">
               Real data from Supabase · Updated: {lastUpdate} ·{" "}
-              <button onClick={fetchAll} className="text-zinc-400 hover:text-white transition-colors underline underline-offset-2">
+              <button onClick={fetchAll} className="text-text-secondary hover:text-text-primary transition-colors underline underline-offset-2">
                 Refresh
               </button>
             </p>
@@ -294,32 +294,32 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
         {loading ? Array.from({length:4}).map((_,i) => <Skeleton key={i} className="h-24 rounded-xl"/>) : (
           <>
-            <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
-              <p className="text-[11px] text-zinc-500 mb-1.5">Total Machines</p>
-              <p className="text-2xl font-medium text-white leading-none mb-1">{machines.length}</p>
+            <div className="bg-surface border border-border-color rounded-xl p-4">
+              <p className="text-[11px] text-text-secondary mb-1.5">Total Machines</p>
+              <p className="text-2xl font-medium text-text-primary leading-none mb-1">{machines.length}</p>
               <p className="text-[11px] text-green-400">From Supabase</p>
             </div>
-            <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
-              <p className="text-[11px] text-zinc-500 mb-1.5">Critical Status</p>
-              <p className={`text-2xl font-medium leading-none mb-1 ${criticalCount > 0 ? "text-red-400" : "text-white"}`}>{criticalCount}</p>
+            <div className="bg-surface border border-border-color rounded-xl p-4">
+              <p className="text-[11px] text-text-secondary mb-1.5">Critical Status</p>
+              <p className={`text-2xl font-medium leading-none mb-1 ${criticalCount > 0 ? "text-red-400" : "text-text-primary"}`}>{criticalCount}</p>
               <p className="text-[11px] text-red-400">{criticalCount > 0 ? "Needs maintenance" : "None"}</p>
             </div>
-            <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
-              <p className="text-[11px] text-zinc-500 mb-1.5">Avg Health Score</p>
+            <div className="bg-surface border border-border-color rounded-xl p-4">
+              <p className="text-[11px] text-text-secondary mb-1.5">Avg Health Score</p>
               <p className={`text-2xl font-medium leading-none mb-1 ${scoreColor(avgHealth)}`}>{avgHealth}%</p>
-              <p className="text-[11px] text-zinc-500">From prediction model</p>
+              <p className="text-[11px] text-text-secondary">From prediction model</p>
             </div>
-            <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
-              <p className="text-[11px] text-zinc-500 mb-1.5">Will Fail in 7 Days</p>
+            <div className="bg-surface border border-border-color rounded-xl p-4">
+              <p className="text-[11px] text-text-secondary mb-1.5">Will Fail in 7 Days</p>
               <p className={`text-2xl font-medium leading-none mb-1 ${willFailCount > 0 ? "text-red-400" : "text-green-400"}`}>{willFailCount}</p>
-              <p className="text-[11px] text-zinc-500">{mostCritical ? `${mostCritical.id} most critical` : "-"}</p>
+              <p className="text-[11px] text-text-secondary">{mostCritical ? `${mostCritical.id} most critical` : "-"}</p>
             </div>
-            <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
-              <p className="text-[11px] text-zinc-500 mb-1.5">Anomalies Detected</p>
-              <p className={`text-2xl font-medium leading-none mb-1 ${machines.filter(m => m.isAnomaly).length > 0 ? "text-purple-400" : "text-white"}`}>
+            <div className="bg-surface border border-border-color rounded-xl p-4">
+              <p className="text-[11px] text-text-secondary mb-1.5">Anomalies Detected</p>
+              <p className={`text-2xl font-medium leading-none mb-1 ${machines.filter(m => m.isAnomaly).length > 0 ? "text-purple-400" : "text-text-primary"}`}>
                 {machines.filter(m => m.isAnomaly).length}
               </p>
-              <p className="text-[11px] text-zinc-500">IsolationForest</p>
+              <p className="text-[11px] text-text-secondary">IsolationForest</p>
             </div>
           </>
         )}
@@ -328,8 +328,8 @@ export default function DashboardPage() {
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
         {/* Left card: Health Score per Machine */}
-        <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
-          <p className="text-[13px] font-medium text-zinc-300 mb-4">Health Score per Machine</p>
+        <div className="bg-surface border border-border-color rounded-xl p-4">
+          <p className="text-[13px] font-medium text-text-primary mb-4">Health Score per Machine</p>
           {loading ? (
             <div className="flex flex-col gap-3">
               {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-8"/>)}
@@ -340,7 +340,7 @@ export default function DashboardPage() {
                 {/* Header row: ID + badges + score */}
                 <div className="flex justify-between items-center mb-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-[12px] text-zinc-400 group-hover:text-white transition-colors">
+                    <span className="text-[12px] text-text-secondary group-hover:text-text-primary transition-colors">
                       {m.id}
                     </span>
                     {m.willFail && (
@@ -365,7 +365,7 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Progress bar */}
-                <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                <div className="h-1.5 bg-surface-hover rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all duration-700 ${barColor(m.healthScore)}`}
                     style={{ width: `${m.healthScore}%` }}
@@ -375,24 +375,24 @@ export default function DashboardPage() {
                 {/* Info rows: sensor + prediction outputs */}
                 {m.latestSensor && (
                   <div className="mt-1 space-y-0.5">
-                    <p className="text-[10px] text-zinc-600">
+                    <p className="text-[10px] text-text-tertiary">
                       Temp: {m.latestSensor.temperature}°C · Vib: {m.latestSensor.vibration} · RPM: {m.latestSensor.rpm}
                       {" · "}
                       <span className={
                         m.rulHours < 24 ? "text-red-500" :
                         m.rulHours < 72 ? "text-red-400" :
                         m.rulHours < 168 ? "text-amber-400" :
-                        "text-zinc-600"
+                        "text-text-tertiary"
                       }>
                         RUL: {formatRUL(m.rulHours)}
                       </span>
                     </p>
-                    <p className="text-[10px] text-zinc-600">
-                      <span className={m.failureProb >= 0.5 ? "text-red-400" : m.failureProb >= 0.2 ? "text-amber-400" : "text-zinc-600"}>
+                    <p className="text-[10px] text-text-tertiary">
+                      <span className={m.failureProb >= 0.5 ? "text-red-400" : m.failureProb >= 0.2 ? "text-amber-400" : "text-text-tertiary"}>
                         Fail: {(m.failureProb * 100).toFixed(1)}%
                       </span>
                       {" · "}
-                      <span className={m.isAnomaly ? "text-purple-400" : "text-zinc-600"}>
+                      <span className={m.isAnomaly ? "text-purple-400" : "text-text-tertiary"}>
                         Anom: {m.anomalyScore.toFixed(2)}
                       </span>
                     </p>
@@ -404,29 +404,29 @@ export default function DashboardPage() {
         </div>
 
         {/* Right card: Sensor Trends */}
-        <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
+        <div className="bg-surface border border-border-color rounded-xl p-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <p className="text-[13px] font-medium text-zinc-300">Sensor Trends</p>
+              <p className="text-[13px] font-medium text-text-primary">Sensor Trends</p>
               <select
                 value={selectedMachine}
                 onChange={(e) => setSelectedMachine(e.target.value)}
                 aria-label="Select machine to view sensor trends"
-                className="bg-white/5 border border-white/10 rounded-md px-2 py-0.5 text-[11px] text-zinc-300 focus:outline-none focus:border-white/20 cursor-pointer hover:bg-white/10 transition-colors"
+                className="bg-surface-hover border border-border-color rounded-md px-2 py-0.5 text-[11px] text-text-secondary focus:outline-none focus:border-text-tertiary cursor-pointer hover:bg-surface-hover transition-colors"
               >
                 {machines.map(m => (
-                  <option key={m.id} value={m.id} className="bg-[#18191c]">
+                  <option key={m.id} value={m.id} className="bg-surface text-text-primary">
                     {m.id}
                   </option>
                 ))}
               </select>
             </div>
-            <span className="text-[10px] text-zinc-500">Real Supabase data</span>
+            <span className="text-[10px] text-text-secondary">Real Supabase data</span>
           </div>
           {loading ? <Skeleton className="h-40"/> : <SensorChart data={sensorTrend}/>}
           <div className="flex gap-4 mt-3">
             {[{label:"Temperature",color:"bg-red-500"},{label:"Vibration×100",color:"bg-amber-400"},{label:"Noise",color:"bg-blue-500"}].map(s => (
-              <span key={s.label} className="flex items-center gap-1.5 text-[10px] text-zinc-500">
+              <span key={s.label} className="flex items-center gap-1.5 text-[10px] text-text-secondary">
                 <span className={`w-2.5 h-0.5 rounded-full ${s.color}`}/>
                 {s.label}
               </span>
@@ -436,22 +436,22 @@ export default function DashboardPage() {
       </div>
 
       {/* Alerts */}
-      <div className="bg-[#18191c] border border-white/5 rounded-xl p-4">
+      <div className="bg-surface border border-border-color rounded-xl p-4">
         <div className="flex items-center justify-between mb-3">
-          <p className="text-[13px] font-medium text-zinc-300">Alerts from Prediction Model</p>
-          <span className="text-[10px] text-zinc-500">Real-time via FastAPI + Supabase</span>
+          <p className="text-[13px] font-medium text-text-primary">Alerts from Prediction Model</p>
+          <span className="text-[10px] text-text-secondary">Real-time via FastAPI + Supabase</span>
         </div>
         {loading ? (
           <div className="flex flex-col gap-2">{Array.from({length:2}).map((_,i) => <Skeleton key={i} className="h-14"/>)}</div>
         ) : alerts.length === 0 ? (
           <div className="py-6 text-center">
             <p className="text-[13px] text-green-400 font-medium">✅ No alerts</p>
-            <p className="text-[11px] text-zinc-500 mt-1">All machines are in normal condition</p>
+            <p className="text-[11px] text-text-secondary mt-1">All machines are in normal condition</p>
           </div>
         ) : (
           alerts.map((m) => (
             <Link key={m.id} href={`/machines/${m.id}`} className="block">
-              <div className="flex items-start justify-between py-3 border-b border-white/5 last:border-0 hover:bg-white/[0.02] rounded-lg px-1 transition-colors">
+              <div className="flex items-start justify-between py-3 border-b border-border-color last:border-0 hover:bg-surface-hover rounded-lg px-1 transition-colors">
                 <div className="flex items-start gap-3">
                   <div className={`w-[3px] h-9 rounded-full shrink-0 mt-0.5 ${m.status === "critical" ? "bg-red-500" : "bg-amber-400"}`}/>
                   <div>
@@ -459,13 +459,13 @@ export default function DashboardPage() {
                       <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${m.status === "critical" ? "bg-red-500 text-white" : "bg-amber-400 text-amber-900"}`}>
                         {m.status === "critical" ? "CRITICAL" : "WARNING"}
                       </span>
-                      <span className="text-[11px] text-zinc-400">{m.id}</span>
-                      <span className="text-[10px] text-zinc-600">Prob: {(m.failureProb * 100).toFixed(1)}%</span>
+                      <span className="text-[11px] text-text-secondary">{m.id}</span>
+                      <span className="text-[10px] text-text-tertiary">Prob: {(m.failureProb * 100).toFixed(1)}%</span>
                     </div>
-                    <p className="text-[12px] text-zinc-500">{m.recommendation}</p>
+                    <p className="text-[12px] text-text-secondary">{m.recommendation}</p>
                   </div>
                 </div>
-                <span className="text-[11px] text-zinc-600 whitespace-nowrap ml-4 pt-0.5">Health: {m.healthScore}%</span>
+                <span className="text-[11px] text-text-tertiary whitespace-nowrap ml-4 pt-0.5">Health: {m.healthScore}%</span>
               </div>
             </Link>
           ))

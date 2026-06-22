@@ -65,7 +65,7 @@ function healthScoreFromProb(probs: { Healthy: number; Warning: number; Critical
 }
 
 function Skeleton({ className }: { className?: string }) {
-  return <div className={`animate-pulse bg-white/5 rounded ${className}`}/>;
+  return <div className={`animate-pulse bg-surface-hover rounded ${className}`}/>;
 }
 
 export default function MachinesPage() {
@@ -160,16 +160,16 @@ export default function MachinesPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-lg font-medium text-white">Machines</h1>
+          <h1 className="text-lg font-medium text-text-primary">Machines</h1>
           {lastUpdate ? (
-            <p className="text-[12px] text-zinc-500 mt-0.5">
+            <p className="text-[12px] text-text-secondary mt-0.5">
               {machines.length} machines · {criticalCount} critical · {warningCount} warning · {willFailCount} will fail in 7 days ·{" "}
-              <button onClick={fetchMachines} className="text-zinc-400 hover:text-white underline underline-offset-2 transition-colors">
+              <button onClick={fetchMachines} className="text-text-secondary hover:text-text-primary underline underline-offset-2 transition-colors">
                 Refresh
               </button>
             </p>
           ) : (
-            <p className="text-[12px] text-zinc-500 mt-0.5">Loading data...</p>
+            <p className="text-[12px] text-text-secondary mt-0.5">Loading data...</p>
           )}
         </div>
 
@@ -178,7 +178,7 @@ export default function MachinesPage() {
           placeholder="Search machines..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[12px] text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-white/20 w-40"
+          className="bg-surface-hover border border-border-color rounded-lg px-3 py-2 text-[12px] text-text-primary placeholder-text-tertiary focus:outline-none focus:border-text-tertiary w-40"
         />
       </div>
 
@@ -195,13 +195,13 @@ export default function MachinesPage() {
       {/* Stats */}
       <div className="grid grid-cols-4 gap-3 mb-5">
         {[
-          { label: "Total Machines",       value: machines.length, color: "text-white"     },
+          { label: "Total Machines",       value: machines.length, color: "text-text-primary" },
           { label: "Critical",             value: criticalCount,   color: "text-red-400"   },
           { label: "Warning",              value: warningCount,    color: "text-amber-400" },
           { label: "Will Fail in 7 Days",  value: willFailCount,   color: "text-red-400"   },
         ].map(s => (
-          <div key={s.label} className="bg-[#18191c] border border-white/5 rounded-xl p-4">
-            <p className="text-[11px] text-zinc-500 mb-1">{s.label}</p>
+          <div key={s.label} className="bg-surface border border-border-color rounded-xl p-4">
+            <p className="text-[11px] text-text-secondary mb-1">{s.label}</p>
             {loading ? <Skeleton className="h-7 w-12"/> :
               <p className={`text-2xl font-medium ${s.color}`}>{s.value}</p>
             }
@@ -210,26 +210,26 @@ export default function MachinesPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-[#18191c] border border-white/5 rounded-xl overflow-hidden">
+      <div className="bg-surface border border-border-color rounded-xl overflow-hidden">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-white/5">
+            <tr className="border-b border-border-color">
               {["ID","Status","Health Score","Failure Prob","Risk","Anomaly","Temp (°C)","Vibration","RPM","Last Data"].map(h => (
-                <th key={h} className="text-left text-[11px] font-medium text-zinc-500 px-4 py-3">{h}</th>
+                <th key={h} className="text-left text-[11px] font-medium text-text-secondary px-4 py-3">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {loading ? (
               Array.from({length: 8}).map((_, i) => (
-                <tr key={i} className="border-b border-white/5">
+                <tr key={i} className="border-b border-border-color">
                   {Array.from({length: 10}).map((_, j) => (
                     <td key={j} className="px-4 py-3"><Skeleton className="h-4 w-full"/></td>
                   ))}
                 </tr>
               ))
             ) : filtered.map(m => (
-              <tr key={m.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02] transition-colors">
+              <tr key={m.id} className="border-b border-border-color last:border-0 hover:bg-surface-hover transition-colors">
                 {/* ID */}
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
@@ -252,7 +252,7 @@ export default function MachinesPage() {
                 {/* Health Score */}
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
-                    <div className="w-16 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                    <div className="w-16 h-1.5 bg-surface-hover rounded-full overflow-hidden">
                       <div className={`h-full rounded-full ${barColor(m.healthScore)}`} style={{width:`${m.healthScore}%`}}/>
                     </div>
                     <span className={`text-[12px] ${scoreColor(m.healthScore)}`}>{m.healthScore}%</span>
@@ -261,7 +261,7 @@ export default function MachinesPage() {
 
                 {/* Failure Prob */}
                 <td className="px-4 py-3">
-                  <span className={`text-[12px] ${m.failureProb >= 0.5 ? "text-red-400" : m.failureProb >= 0.2 ? "text-amber-400" : "text-zinc-400"}`}>
+                  <span className={`text-[12px] ${m.failureProb >= 0.5 ? "text-red-400" : m.failureProb >= 0.2 ? "text-amber-400" : "text-text-secondary"}`}>
                     {(m.failureProb * 100).toFixed(1)}%
                   </span>
                 </td>
@@ -278,7 +278,7 @@ export default function MachinesPage() {
                 {/* Anomaly */}
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1.5">
-                    <span className={`text-[12px] ${m.isAnomaly ? "text-purple-400" : "text-zinc-500"}`}>
+                    <span className={`text-[12px] ${m.isAnomaly ? "text-purple-400" : "text-text-tertiary"}`}>
                       {m.anomalyScore.toFixed(2)}
                     </span>
                     {m.isAnomaly && (
@@ -290,23 +290,23 @@ export default function MachinesPage() {
                 </td>
 
                 {/* Temp */}
-                <td className="px-4 py-3 text-[12px] text-zinc-400">{m.temperature.toFixed(1)}</td>
+                <td className="px-4 py-3 text-[12px] text-text-secondary">{m.temperature.toFixed(1)}</td>
 
                 {/* Vibration */}
-                <td className="px-4 py-3 text-[12px] text-zinc-400">{m.vibration.toFixed(2)}</td>
+                <td className="px-4 py-3 text-[12px] text-text-secondary">{m.vibration.toFixed(2)}</td>
 
                 {/* RPM */}
-                <td className="px-4 py-3 text-[12px] text-zinc-400">{m.rpm}</td>
+                <td className="px-4 py-3 text-[12px] text-text-secondary">{m.rpm}</td>
 
                 {/* Last data */}
-                <td className="px-4 py-3 text-[12px] text-zinc-500">{m.lastTimestamp}</td>
+                <td className="px-4 py-3 text-[12px] text-text-secondary">{m.lastTimestamp}</td>
               </tr>
             ))}
           </tbody>
         </table>
 
         {!loading && filtered.length === 0 && (
-          <div className="py-8 text-center text-[12px] text-zinc-500">
+          <div className="py-8 text-center text-[12px] text-text-secondary">
             No machines found
           </div>
         )}

@@ -1,28 +1,67 @@
 @import "tailwindcss";
 
 :root {
+  /* ===== LIGHT MODE (default) ===== */
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #18191c;
+
+  --surface: #ffffff;          /* card / sidebar bg */
+  --surface-hover: #f4f4f5;
+
+  --border-color: #e4e4e7;
+
+  --text-primary: #18191c;
+  --text-secondary: #71717a;   /* setara zinc-500 */
+  --text-tertiary: #a1a1aa;    /* setara zinc-400 */
+
+  --sidebar-bg: #fafafa;
+  --sidebar-active-bg: #f0f0f1;
+  --sidebar-active-text: #18191c;
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+.dark {
+  /* ===== DARK MODE ===== */
+  --background: #111214;
+  --foreground: #ededed;
+
+  --surface: #18191c;
+  --surface-hover: rgba(255, 255, 255, 0.05);
+
+  --border-color: rgba(255, 255, 255, 0.05);
+
+  --text-primary: #ededed;
+  --text-secondary: #a1a1aa;   /* zinc-400 */
+  --text-tertiary: #71717a;    /* zinc-500 */
+
+  --sidebar-bg: #18191c;
+  --sidebar-active-bg: rgba(255, 255, 255, 0.1);
+  --sidebar-active-text: #ffffff;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-border-color: var(--border-color);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-sidebar-bg: var(--sidebar-bg);
+  --color-sidebar-active-bg: var(--sidebar-active-bg);
+  --color-sidebar-active-text: var(--sidebar-active-text);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 /* Hide scrollbar sidebar */
@@ -44,16 +83,16 @@ aside {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #2d2d2d;
+  background: var(--border-color);
   border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #444444;
+  background: var(--text-tertiary);
 }
 
 /* Firefox */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #2d2d2d transparent;
+  scrollbar-color: var(--border-color) transparent;
 }
